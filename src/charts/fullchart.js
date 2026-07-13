@@ -46,25 +46,27 @@ export function drawFullChart(container, data, cfg, period) {
   roughF.appendChild(disp);
   defs.appendChild(roughF);
 
-  // Drop shadow (relief effect)
+  // Drop shadow (relief effect) — tinted via feFlood so it stays a soft
+  // dark shadow in light mode and a soft light glow in dark mode.
   const dropF  = svgEl('filter', { id: 'ocm-drop', x: '-20%', y: '-20%', width: '140%', height: '140%' });
   const fBlur  = svgEl('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: '3', result: 'blur' });
   const fOff   = svgEl('feOffset', { in: 'blur', dx: '2', dy: '4', result: 'off' });
-  const fComp  = svgEl('feComponentTransfer', { in: 'off', result: 'sh' });
-  fComp.appendChild(svgEl('feFuncA', { type: 'linear', slope: '0.28' }));
+  const fFlood = svgEl('feFlood', { style: `flood-color: ${T.shadow}`, result: 'floodColor' });
+  const fComp  = svgEl('feComposite', { in: 'floodColor', in2: 'off', operator: 'in', result: 'sh' });
   const fMerge = svgEl('feMerge');
   fMerge.appendChild(svgEl('feMergeNode', { in: 'sh' }));
   fMerge.appendChild(svgEl('feMergeNode', { in: 'SourceGraphic' }));
   dropF.appendChild(fBlur);
   dropF.appendChild(fOff);
+  dropF.appendChild(fFlood);
   dropF.appendChild(fComp);
   dropF.appendChild(fMerge);
   defs.appendChild(dropF);
 
-  // Volume gradient (area fill)
+  // Volume gradient (area fill) — same adaptive tone as the curve/bars
   const volGrad = svgEl('linearGradient', { id: 'ocm-vol', x1: '0', y1: '0', x2: '0', y2: '1' });
-  volGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': T.ink, 'stop-opacity': '0.22' }));
-  volGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': T.ink, 'stop-opacity': '0.02' }));
+  volGrad.appendChild(svgEl('stop', { offset: '0%',   style: `stop-color: ${T.lineFill}`, 'stop-opacity': '0.22' }));
+  volGrad.appendChild(svgEl('stop', { offset: '100%', style: `stop-color: ${T.lineFill}`, 'stop-opacity': '0.02' }));
   defs.appendChild(volGrad);
 
   // Ridge highlight (just under line)
@@ -95,8 +97,8 @@ export function drawFullChart(container, data, cfg, period) {
       x: PAD.left - 8, y: y + 4,
       'text-anchor': 'end',
       'font-family': T.body,
-      'font-size': '10',
-      fill: 'rgba(128,128,128,0.55)',
+      'font-size': '12',
+      fill: 'rgba(128,128,128,0.65)',
       'font-style': 'italic',
     });
     lbl.textContent = val > 1e9 ? `${(val / 1e9).toFixed(0)}B`
@@ -119,8 +121,8 @@ export function drawFullChart(container, data, cfg, period) {
     const lbl = svgEl('text', {
       x, y: PAD.top + CH + 18,
       'text-anchor': 'middle',
-      'font-family': T.body, 'font-size': '10',
-      fill: 'rgba(128,128,128,0.5)', 'font-style': 'italic',
+      'font-family': T.body, 'font-size': '12',
+      fill: 'rgba(128,128,128,0.6)', 'font-style': 'italic',
     });
     lbl.textContent = MONTHS[mo];
     svg.appendChild(lbl);
@@ -180,10 +182,11 @@ function _drawBars(svg, defs, sliced, min, range) {
     const y      = PAD.top + CH - h;
     const isLast = i === sliced.length - 1;
 
+    const barColor = isLast ? T.accent : T.line;
     const gradId = `ocm-bv-${i}`;
     const grad   = svgEl('linearGradient', { id: gradId, x1: '0', y1: '0', x2: '0', y2: '1' });
-    grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isLast ? T.accent : T.ink, 'stop-opacity': isLast ? '1' : '0.85' }));
-    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isLast ? T.accent : T.ink, 'stop-opacity': isLast ? '0.75' : '0.6' }));
+    grad.appendChild(svgEl('stop', { offset: '0%',   style: `stop-color: ${barColor}`, 'stop-opacity': isLast ? '1' : '0.85' }));
+    grad.appendChild(svgEl('stop', { offset: '100%', style: `stop-color: ${barColor}`, 'stop-opacity': isLast ? '0.75' : '0.6' }));
     defs.appendChild(grad);
 
     const barG = svgEl('g', { filter: 'url(#ocm-drop)' });
@@ -208,7 +211,7 @@ function _drawLineCurve(svg, points, data, cfg, sliced) {
 
   // Curves with filter
   const curveG = svgEl('g', { filter: 'url(#ocm-rough)', 'clip-path': 'url(#ocm-clip)' });
-  curveG.appendChild(svgEl('path', { d: linePath, fill: 'none', stroke: T.ink, 'stroke-width': '2.2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', filter: 'url(#ocm-drop)' }));
+  curveG.appendChild(svgEl('path', { d: linePath, fill: 'none', style: `stroke: ${T.line}`, 'stroke-width': '2.2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', filter: 'url(#ocm-drop)' }));
 
   if (points.length > 12) {
     curveG.appendChild(svgEl('path', {

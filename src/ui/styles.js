@@ -36,13 +36,16 @@ export function injectGalleryStyles() {
       font-size: 12px;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      color: rgba(250,247,241,0.55);
+      color: ${T.textAdaptiveMuted};
       padding: 8px 10px;
       border-radius: 3px;
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
-    .ocm-sidebar-item:hover { color: ${T.paper}; background: rgba(255,255,255,0.05); }
+    .ocm-sidebar-item:hover {
+      color: ${T.textAdaptive};
+      background: light-dark(rgba(0,0,0,0.05), rgba(255,255,255,0.05));
+    }
     .ocm-sidebar-item.ocm-sidebar-active {
       color: ${T.accent};
       background: rgba(247,147,26,0.10);
@@ -53,6 +56,14 @@ export function injectGalleryStyles() {
     .ocm-cards-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       gap: 20px !important;
+      background: transparent !important;
+    }
+
+    .ocm-category-section {
+      border: 1px solid light-dark(rgba(0,0,0,0.14), rgba(255,255,255,0.14));
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 24px;
     }
 
     .ocm-card-chart-full {
@@ -94,7 +105,7 @@ export function injectGalleryStyles() {
       cursor: pointer;
       transition: background 0.15s, color 0.15s;
     }
-    .ocm-card-period-btn:hover { color: ${T.ink}; }
+    .ocm-card-period-btn:hover { color: ${T.textAdaptive}; }
     .ocm-card-period-btn.ocm-card-period-active {
       color: ${T.accent};
       background: rgba(247,147,26,0.12);
