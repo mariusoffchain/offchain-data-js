@@ -10,7 +10,10 @@ var OCMData=(()=>{var R=[{id:"btc-price",title:"Bitcoin Price",subtitle:"BTC/USD
       overflow-x: auto;
       padding: 24px 4px 28px;
       margin-bottom: 8px;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
     }
+    .ocm-blockstrip::-webkit-scrollbar { display: none; }
 
     .ocm-blockstrip-divider {
       flex: 0 0 auto;
