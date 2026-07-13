@@ -234,7 +234,9 @@ export async function loadMempoolBlocks() {
  */
 export async function loadRecentBlocks() {
   try {
-    const r = await fetch(`${MEMPOOL_BASE}/api/blocks`);
+    // v1, not the plain /api/blocks — only v1 includes `extras`
+    // (pool name, medianFee, feeRange, totalFees) that the strip renders.
+    const r = await fetch(`${MEMPOOL_BASE}/api/v1/blocks`);
     if (!r.ok) throw new Error(`blocks HTTP ${r.status}`);
     return { data: await r.json(), live: true };
   } catch (err) {

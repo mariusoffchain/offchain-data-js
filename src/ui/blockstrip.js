@@ -23,7 +23,6 @@ const DEPTH = 10; // cube bevel depth, in the 0-100 viewBox unit
 
 let lastPending   = [];
 let lastConfirmed = [];
-let reversed      = false;
 
 export function initBlockStrip() {
   const host = document.querySelector('.ocm-data-hero') || document.querySelector('.ocm-gallery-view');
@@ -35,13 +34,9 @@ export function initBlockStrip() {
   const pendingPane = document.createElement('div');
   pendingPane.className = 'ocm-blockstrip-pane ocm-blockstrip-pane--pending';
 
+  // Purely visual pivot between pending and confirmed — not a control.
   const divider = document.createElement('div');
   divider.className = 'ocm-blockstrip-divider';
-  divider.title = 'Reverse order';
-  divider.addEventListener('click', () => {
-    reversed = !reversed;
-    _render(pendingPane, confirmedPane);
-  });
 
   const confirmedPane = document.createElement('div');
   confirmedPane.className = 'ocm-blockstrip-pane ocm-blockstrip-pane--confirmed';
@@ -69,19 +64,18 @@ function _render(pendingPane, confirmedPane) {
   pendingPane.innerHTML   = '';
   confirmedPane.innerHTML = '';
 
-  // minutesOut reflects each block's real queue position (index 0 =
-  // next), computed before any reorder — not the display slot, so the
-  // ETA stays correct regardless of which end faces the divider.
-  const pendingOrdered = reversed ? [...lastPending] : [...lastPending].reverse();
-  pendingOrdered.forEach(b => {
+  // Pending: soonest block (index 0) sits last, i.e. closest to the
+  // divider (pane is right-aligned). Confirmed: API order is already
+  // newest-first, so the most recent block sits first, closest to
+  // the divider on the other side.
+  [...lastPending].reverse().forEach(b => {
     pendingPane.appendChild(_cube('pending', {
       fee: b.medianFee, range: b.feeRange, fees: b.totalFees,
       txs: b.nTx, size: b.blockSize, meta: `in ~${(b._index + 1) * 10} min`,
     }));
   });
 
-  const confirmedOrdered = reversed ? [...lastConfirmed].reverse() : lastConfirmed;
-  confirmedOrdered.forEach(b => {
+  lastConfirmed.forEach(b => {
     confirmedPane.appendChild(_cube('confirmed', {
       fee: b.extras.medianFee, range: b.extras.feeRange, fees: b.extras.totalFees,
       txs: b.tx_count, size: b.size,

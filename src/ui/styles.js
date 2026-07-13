@@ -40,13 +40,10 @@ export function injectGalleryStyles() {
       display: flex;
       align-items: center;
       color: ${T.textAdaptiveMuted};
-      font-size: 18px;
-      padding: 0 14px;
-      cursor: pointer;
-      transition: color 0.15s;
+      font-size: 20px;
+      padding: 0 16px;
     }
-    .ocm-blockstrip-divider:hover { color: ${T.textAdaptive}; }
-    .ocm-blockstrip-divider::before { content: '⇄'; }
+    .ocm-blockstrip-divider::before { content: '⛏️'; }
 
     .ocm-block-cube {
       position: relative;
