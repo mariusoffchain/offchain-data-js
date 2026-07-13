@@ -184,6 +184,76 @@ async function fetchHashPrice() {
     .filter(Boolean);
 }
 
+// ─── Block explorer strip (mempool + confirmed blocks) ────────────
+// Not part of the {ts,v} time-series system above — these return
+// structured block objects, rendered by ui/blockstrip.js.
+
+function mockMempoolBlocks() {
+  return [
+    { medianFee: 2.1, feeRange: [1.0, 1.2, 1.3, 2.0, 2.7, 4.0, 201], nTx: 4327, totalFees: 2500000, blockSize: 2054070 },
+    { medianFee: 1.4, feeRange: [0.5, 0.6, 0.7, 1.0, 1.5, 2.2, 150],  nTx: 6755, totalFees: 1600000, blockSize: 1997000 },
+    { medianFee: 0.6, feeRange: [0.36, 0.4, 0.42, 0.5, 0.7, 1.0, 45], nTx: 5777, totalFees: 950000,  blockSize: 1584123 },
+  ];
+}
+
+function mockRecentBlocks() {
+  const pools = ['F2Pool', 'Foundry USA', 'Luxor', 'AntPool', 'ViaBTC', 'ⓈBTC.com'];
+  const now = Date.now();
+  return Array.from({ length: 6 }, (_, i) => ({
+    height:    957896 - i,
+    timestamp: Math.floor((now - i * 9.7 * 60_000) / 1000),
+    tx_count:  4362 - i * 235,
+    size:      1561683 + i * 12000,
+    extras: {
+      medianFee: 1.1 + i * 0.1,
+      feeRange:  [0.55 - i * 0.02, 0.7, 1, 2, 3, 5, 161 - i * 10],
+      totalFees: 1883531 - i * 90000,
+      pool:      { name: pools[i % pools.length] },
+    },
+  }));
+}
+
+/**
+ * loadMempoolBlocks()
+ * Returns { data: Array<projected block>, live: boolean }
+ */
+export async function loadMempoolBlocks() {
+  try {
+    const r = await fetch(`${MEMPOOL_BASE}/api/v1/fees/mempool-blocks`);
+    if (!r.ok) throw new Error(`mempool-blocks HTTP ${r.status}`);
+    return { data: await r.json(), live: true };
+  } catch (err) {
+    console.warn('[data] Falling back to mock for "mempool-blocks":', err.message);
+    return { data: mockMempoolBlocks(), live: false };
+  }
+}
+
+/**
+ * loadRecentBlocks()
+ * Returns { data: Array<confirmed block>, live: boolean }
+ */
+export async function loadRecentBlocks() {
+  try {
+    const r = await fetch(`${MEMPOOL_BASE}/api/blocks`);
+    if (!r.ok) throw new Error(`blocks HTTP ${r.status}`);
+    return { data: await r.json(), live: true };
+  } catch (err) {
+    console.warn('[data] Falling back to mock for "blocks":', err.message);
+    return { data: mockRecentBlocks(), live: false };
+  }
+}
+
+/**
+ * fmtTimeAgo(unixSeconds)
+ * Relative time for confirmed blocks, e.g. "15 min ago".
+ */
+export function fmtTimeAgo(unixSeconds) {
+  const diffMin = Math.max(0, Math.round((Date.now() - unixSeconds * 1000) / 60_000));
+  if (diffMin < 1)  return 'just now';
+  if (diffMin < 60) return `${diffMin} min ago`;
+  return `${Math.round(diffMin / 60)}h ago`;
+}
+
 // CoinGecko: fetch market chart once, split into price / marketcap / volume
 async function fetchMarketChart() {
   if (cache._market) return cache._market;

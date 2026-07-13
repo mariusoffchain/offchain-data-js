@@ -20,6 +20,7 @@ export const T = {
   lineFill:  'light-dark(#1a1a1a, #f2f2f2)',         // area/volume gradient base
   shadow:    'light-dark(rgba(0,0,0,0.32), rgba(255,255,255,0.20))',
   textAdaptive: 'light-dark(#1a1a1a, #ffffff)',
+  textAdaptiveInverse: 'light-dark(#ffffff, #1a1a1a)', // opposite of textAdaptive — for solid-fill blocks
   textAdaptiveMuted: 'light-dark(rgba(26,26,26,0.55), rgba(255,255,255,0.55))',
 };
 

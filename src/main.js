@@ -7,8 +7,9 @@
  *   detail   ← shown when a card is clicked, hidden on back button
  */
 
-import { initGallery }  from './ui/gallery.js';
-import { renderDetail } from './ui/detail.js';
+import { initGallery }    from './ui/gallery.js';
+import { renderDetail }   from './ui/detail.js';
+import { initBlockStrip } from './ui/blockstrip.js';
 
 // ── State ─────────────────────────────────────────────────────────
 let currentChartId = null;
@@ -59,6 +60,7 @@ document.addEventListener('ocm:openChart', e => showDetail(e.detail));
 async function boot() {
   initPeriodBtns();
   initBackBtn();
+  initBlockStrip();
   await initGallery(showDetail);
 }
 

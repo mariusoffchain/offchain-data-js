@@ -15,6 +15,79 @@ export function injectGalleryStyles() {
   const style = document.createElement('style');
   style.textContent = `
     .ocm-data-filters { display: none !important; }
+    .ocm-data-hero { display: none !important; }
+
+    .ocm-blockstrip {
+      display: flex;
+      align-items: flex-start;
+      gap: 18px;
+      overflow-x: auto;
+      padding: 24px 4px 28px;
+      margin-bottom: 8px;
+    }
+
+    .ocm-blockstrip-divider {
+      flex: 0 0 auto;
+      align-self: stretch;
+      display: flex;
+      align-items: center;
+      color: ${T.textAdaptiveMuted};
+      font-size: 18px;
+      padding: 0 2px;
+    }
+    .ocm-blockstrip-divider::before { content: '⇄'; }
+
+    .ocm-block-cube {
+      position: relative;
+      flex: 0 0 auto;
+      width: 150px;
+    }
+    .ocm-block-cube-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+    .ocm-block-cube-content {
+      position: relative;
+      padding: 18px 16px 12px 12px;
+    }
+
+    .ocm-block-cube--pending .ocm-bc-fee,
+    .ocm-block-cube--pending .ocm-bc-range,
+    .ocm-block-cube--pending .ocm-bc-row,
+    .ocm-block-cube--pending .ocm-bc-meta { color: ${T.textAdaptive}; }
+
+    .ocm-block-cube--confirmed .ocm-bc-fee,
+    .ocm-block-cube--confirmed .ocm-bc-range,
+    .ocm-block-cube--confirmed .ocm-bc-row,
+    .ocm-block-cube--confirmed .ocm-bc-meta { color: ${T.textAdaptiveInverse}; }
+
+    .ocm-bc-fee {
+      font-family: ${T.heading};
+      font-size: 15px;
+      font-weight: 600;
+      margin: 0;
+    }
+    .ocm-bc-range {
+      font-size: 10px;
+      opacity: 0.75;
+      margin: 2px 0 8px;
+    }
+    .ocm-bc-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      opacity: 0.85;
+      margin: 2px 0;
+      gap: 8px;
+    }
+    .ocm-bc-meta {
+      font-size: 10px;
+      opacity: 0.75;
+      margin: 8px 0 0;
+    }
 
     .ocm-gallery-view {
       display: flex;
