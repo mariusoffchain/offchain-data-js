@@ -79,7 +79,7 @@ export function injectGalleryStyles() {
       font-family: ${T.heading};
       font-size: 22px;
       font-weight: 600;
-      color: ${T.paper};
+      color: ${T.accent};
       letter-spacing: 0.01em;
       text-align: right;
       white-space: nowrap;

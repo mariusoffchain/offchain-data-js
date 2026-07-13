@@ -65,7 +65,7 @@ var OCMData=(()=>{var D=[{id:"btc-price",title:"Bitcoin Price",subtitle:"BTC/USD
       font-family: ${l.heading};
       font-size: 22px;
       font-weight: 600;
-      color: ${l.paper};
+      color: ${l.accent};
       letter-spacing: 0.01em;
       text-align: right;
       white-space: nowrap;
