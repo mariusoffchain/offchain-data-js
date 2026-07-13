@@ -20,12 +20,19 @@ export function injectGalleryStyles() {
     .ocm-blockstrip {
       display: flex;
       align-items: stretch;
-      gap: 18px;
-      overflow-x: auto;
       padding: 24px 4px 28px;
       margin-bottom: 8px;
     }
-    .ocm-blockstrip.ocm-blockstrip--reversed { flex-direction: row-reverse; }
+
+    .ocm-blockstrip-pane {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      align-items: stretch;
+      gap: 18px;
+      overflow-x: auto;
+    }
+    .ocm-blockstrip-pane--pending { justify-content: flex-end; }
 
     .ocm-blockstrip-divider {
       flex: 0 0 auto;
@@ -34,7 +41,7 @@ export function injectGalleryStyles() {
       align-items: center;
       color: ${T.textAdaptiveMuted};
       font-size: 18px;
-      padding: 0 6px;
+      padding: 0 14px;
       cursor: pointer;
       transition: color 0.15s;
     }
@@ -45,7 +52,7 @@ export function injectGalleryStyles() {
       position: relative;
       flex: 0 0 auto;
       width: 150px;
-      height: 152px;
+      height: 160px;
     }
     .ocm-block-cube-bg {
       position: absolute;
@@ -56,11 +63,12 @@ export function injectGalleryStyles() {
     }
     .ocm-block-cube-content {
       position: relative;
-      height: 100%;
       box-sizing: border-box;
-      padding: 22px 20px 16px 18px;
-      display: flex;
-      flex-direction: column;
+      /* Front face (the flat square, ignoring the top/right bevel) is
+         inset 10% from the top and right — pad past that line, not
+         past the cube's outer bounds, so text centers on the square
+         you actually read, not the bevel. */
+      padding: 30px 26px 14px 14px;
     }
 
     .ocm-block-cube--pending .ocm-bc-fee,
@@ -95,12 +103,10 @@ export function injectGalleryStyles() {
     .ocm-bc-meta {
       font-size: 10px;
       opacity: 0.75;
-      margin: 8px 0 0;
+      margin: 10px 0 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      margin-top: auto;
-      padding-top: 8px;
     }
 
     .ocm-gallery-view {

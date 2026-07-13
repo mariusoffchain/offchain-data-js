@@ -7,6 +7,11 @@
  * Cube faces are three polygons sharing exact vertices, so corners
  * always line up regardless of card size (no CSS skew/transform
  * approximation).
+ *
+ * Layout: two equal-width panes (pending / confirmed) each scroll
+ * independently, so the divider between them always sits at the
+ * horizontal center of the strip regardless of how many blocks are
+ * on either side.
  */
 
 import { svgEl } from '../drawing.js';
@@ -16,55 +21,69 @@ import { loadMempoolBlocks, loadRecentBlocks, fmtTimeAgo } from '../data.js';
 const REFRESH_MS = 45_000;
 const DEPTH = 10; // cube bevel depth, in the 0-100 viewBox unit
 
+let lastPending   = [];
+let lastConfirmed = [];
+let reversed      = false;
+
 export function initBlockStrip() {
   const host = document.querySelector('.ocm-data-hero') || document.querySelector('.ocm-gallery-view');
   if (!host || !host.parentElement) return;
 
   const strip = document.createElement('div');
   strip.className = 'ocm-blockstrip';
-  host.parentElement.insertBefore(strip, host);
 
-  const render = () => _refresh(strip);
-  render();
-  setInterval(render, REFRESH_MS);
-}
-
-async function _refresh(strip) {
-  const [{ data: pending }, { data: confirmed }] = await Promise.all([
-    loadMempoolBlocks(),
-    loadRecentBlocks(),
-  ]);
-
-  strip.innerHTML = '';
-
-  pending.slice(0, 3).reverse().forEach((b, i, arr) => {
-    const minutesOut = (arr.length - i) * 10;
-    strip.appendChild(_cube('pending', {
-      fee:    b.medianFee,
-      range:  b.feeRange,
-      fees:   b.totalFees,
-      txs:    b.nTx,
-      size:   b.blockSize,
-      meta:   `in ~${minutesOut} min`,
-    }));
-  });
+  const pendingPane = document.createElement('div');
+  pendingPane.className = 'ocm-blockstrip-pane ocm-blockstrip-pane--pending';
 
   const divider = document.createElement('div');
   divider.className = 'ocm-blockstrip-divider';
   divider.title = 'Reverse order';
   divider.addEventListener('click', () => {
-    strip.classList.toggle('ocm-blockstrip--reversed');
+    reversed = !reversed;
+    _render(pendingPane, confirmedPane);
   });
-  strip.appendChild(divider);
 
-  confirmed.slice(0, 8).forEach(b => {
-    strip.appendChild(_cube('confirmed', {
-      fee:   b.extras.medianFee,
-      range: b.extras.feeRange,
-      fees:  b.extras.totalFees,
-      txs:   b.tx_count,
-      size:  b.size,
-      meta:  `${b.height.toLocaleString('en-US')} · ${fmtTimeAgo(b.timestamp)} · ${b.extras.pool.name}`,
+  const confirmedPane = document.createElement('div');
+  confirmedPane.className = 'ocm-blockstrip-pane ocm-blockstrip-pane--confirmed';
+
+  strip.appendChild(pendingPane);
+  strip.appendChild(divider);
+  strip.appendChild(confirmedPane);
+  host.parentElement.insertBefore(strip, host);
+
+  const fetchAndRender = async () => {
+    const [{ data: pending }, { data: confirmed }] = await Promise.all([
+      loadMempoolBlocks(),
+      loadRecentBlocks(),
+    ]);
+    lastPending   = pending.slice(0, 3);
+    lastConfirmed = confirmed.slice(0, 8);
+    _render(pendingPane, confirmedPane);
+  };
+
+  fetchAndRender();
+  setInterval(fetchAndRender, REFRESH_MS);
+}
+
+function _render(pendingPane, confirmedPane) {
+  pendingPane.innerHTML   = '';
+  confirmedPane.innerHTML = '';
+
+  const pendingOrdered = reversed ? [...lastPending] : [...lastPending].reverse();
+  pendingOrdered.forEach((b, i, arr) => {
+    const minutesOut = (arr.length - i) * 10;
+    pendingPane.appendChild(_cube('pending', {
+      fee: b.medianFee, range: b.feeRange, fees: b.totalFees,
+      txs: b.nTx, size: b.blockSize, meta: `in ~${minutesOut} min`,
+    }));
+  });
+
+  const confirmedOrdered = reversed ? [...lastConfirmed].reverse() : lastConfirmed;
+  confirmedOrdered.forEach(b => {
+    confirmedPane.appendChild(_cube('confirmed', {
+      fee: b.extras.medianFee, range: b.extras.feeRange, fees: b.extras.totalFees,
+      txs: b.tx_count, size: b.size,
+      meta: `${b.height.toLocaleString('en-US')} · ${fmtTimeAgo(b.timestamp)} · ${b.extras.pool.name}`,
     }));
   });
 }
@@ -74,7 +93,7 @@ function _cube(kind, d) {
   wrap.className = `ocm-block-cube ocm-block-cube--${kind}`;
 
   const isConfirmed = kind === 'confirmed';
-  const front = isConfirmed ? T.textAdaptive : 'none';
+  const front  = isConfirmed ? T.textAdaptive : 'none';
   const stroke = T.textAdaptive;
 
   const svg = svgEl('svg', {
