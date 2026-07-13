@@ -15,6 +15,17 @@
 
 import { PERIOD_N } from './tokens.js';
 
+// ─── API configuration ────────────────────────────────────────────
+// mempool.space blocks browser CORS, so all its endpoints go through
+// the Cloudflare Worker proxy (source + deploy steps in worker/).
+// Until the worker is live these fetchers fail → mock fallback.
+const MEMPOOL_BASE = 'https://ocm-proxy.mariusoffchain.workers.dev';
+
+// CoinGecko free "demo" key (30 req/min) — create one at
+// https://www.coingecko.com/en/developers/dashboard, paste it here,
+// then `npm run build` and push.
+const COINGECKO_API_KEY = '';
+
 // ─── In-memory cache (keyed by api id) ───────────────────────────
 const cache = {};
 
@@ -53,19 +64,67 @@ const MOCK = {
 
 // ─── Live fetchers ────────────────────────────────────────────────
 
+// Bucket a series by UTC day and average, so every API lines up with
+// PERIOD_N's one-point-per-day assumption.
+function dailyAvg(points) {
+  const days = new Map();
+  for (const { ts, v } of points) {
+    const day = Math.floor(ts / 86_400_000);
+    const b   = days.get(day) || { sum: 0, n: 0 };
+    b.sum += v;
+    b.n   += 1;
+    days.set(day, b);
+  }
+  return [...days.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([day, { sum, n }]) => ({ ts: day * 86_400_000, v: sum / n }));
+}
+
 async function fetchHashrate() {
-  const r = await fetch('https://mempool.space/api/v1/mining/hashrate/1y');
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/hashrate/1y`);
   if (!r.ok) throw new Error(`hashrate HTTP ${r.status}`);
   const j = await r.json();
   return j.hashrates.map(d => ({ ts: d.timestamp * 1000, v: d.avgHashrate / 1e18 }));
 }
 
+async function fetchDifficulty() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/difficulty-adjustments/1y`);
+  if (!r.ok) throw new Error(`difficulty HTTP ${r.status}`);
+  const j = await r.json(); // [[ts_s, height, difficulty, adjustment], ...] newest first
+  return j
+    .map(([ts, , diff]) => ({ ts: ts * 1000, v: diff / 1e12 }))
+    .sort((a, b) => a.ts - b.ts);
+}
+
+async function fetchBlockFees() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fees/1y`);
+  if (!r.ok) throw new Error(`fees HTTP ${r.status}`);
+  const j = await r.json(); // [{ timestamp, avgFees (sats) }, ...]
+  return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFees / 1e8 })));
+}
+
+async function fetchFeeRates() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fee-rates/1y`);
+  if (!r.ok) throw new Error(`feerates HTTP ${r.status}`);
+  const j = await r.json(); // [{ timestamp, avgFee_50 (sat/vB) }, ...]
+  return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFee_50 })));
+}
+
+async function fetchMempool() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/statistics/1y`);
+  if (!r.ok) throw new Error(`mempool HTTP ${r.status}`);
+  const j = await r.json(); // [{ added (ts_s), vsizes: [vB per fee bucket] }, ...] newest first
+  return dailyAvg(j.map(d => ({
+    ts: d.added * 1000,
+    v:  d.vsizes.reduce((a, b) => a + b, 0) / 1e6, // total pending vMB
+  })));
+}
+
 // CoinGecko: fetch market chart once, split into price / marketcap / volume
 async function fetchMarketChart() {
   if (cache._market) return cache._market;
-  // TODO: replace with your CoinGecko API key for live data
-  // const r = await fetch('https://pro-api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily&x_cg_pro_api_key=YOUR_KEY');
-  const r = await fetch('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily');
+  const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
+  const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily${key}`);
   if (!r.ok) throw new Error(`CoinGecko HTTP ${r.status}`);
   const j = await r.json();
   cache._market = {
@@ -78,13 +137,15 @@ async function fetchMarketChart() {
 
 // Map api id → async fetcher function
 const FETCHERS = {
-  hashrate:  fetchHashrate,
-  price:     async () => (await fetchMarketChart()).price,
-  marketcap: async () => (await fetchMarketChart()).marketcap,
-  volume:    async () => (await fetchMarketChart()).volume,
-  // Add more fetchers here as APIs become available:
-  // difficulty: fetchDifficulty,
-  // mempool: fetchMempool,
+  hashrate:   fetchHashrate,
+  difficulty: fetchDifficulty,
+  fees:       fetchBlockFees,
+  feerates:   fetchFeeRates,
+  mempool:    fetchMempool,
+  price:      async () => (await fetchMarketChart()).price,
+  marketcap:  async () => (await fetchMarketChart()).marketcap,
+  volume:     async () => (await fetchMarketChart()).volume,
+  // Add more fetchers here as APIs become available (Glassnode: paid key)
 };
 
 // ─── Public API ───────────────────────────────────────────────────
