@@ -43,6 +43,7 @@ var OCMData=(()=>{var G=[{id:"btc-price",title:"Bitcoin Price",subtitle:"BTC/USD
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       gap: 20px !important;
       background: transparent !important;
+      border: none !important;
     }
 
     .ocm-category-section {
