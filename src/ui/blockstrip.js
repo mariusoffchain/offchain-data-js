@@ -56,7 +56,7 @@ export function initBlockStrip() {
       loadMempoolBlocks(),
       loadRecentBlocks(),
     ]);
-    lastPending   = pending.slice(0, 3);
+    lastPending   = pending.slice(0, 3).map((b, i) => ({ ...b, _index: i }));
     lastConfirmed = confirmed.slice(0, 8);
     _render(pendingPane, confirmedPane);
   };
@@ -69,12 +69,14 @@ function _render(pendingPane, confirmedPane) {
   pendingPane.innerHTML   = '';
   confirmedPane.innerHTML = '';
 
+  // minutesOut reflects each block's real queue position (index 0 =
+  // next), computed before any reorder — not the display slot, so the
+  // ETA stays correct regardless of which end faces the divider.
   const pendingOrdered = reversed ? [...lastPending] : [...lastPending].reverse();
-  pendingOrdered.forEach((b, i, arr) => {
-    const minutesOut = (arr.length - i) * 10;
+  pendingOrdered.forEach(b => {
     pendingPane.appendChild(_cube('pending', {
       fee: b.medianFee, range: b.feeRange, fees: b.totalFees,
-      txs: b.nTx, size: b.blockSize, meta: `in ~${minutesOut} min`,
+      txs: b.nTx, size: b.blockSize, meta: `in ~${(b._index + 1) * 10} min`,
     }));
   });
 
