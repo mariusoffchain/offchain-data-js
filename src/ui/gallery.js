@@ -4,7 +4,7 @@
  */
 
 import { CATALOG } from '../catalog.js';
-import { loadData, slicePeriod, fmtVal } from '../data.js';
+import { loadData, slicePeriod, fmtVal, fmtValBig } from '../data.js';
 import { drawFullChart } from '../charts/fullchart.js';
 import { initSidebar } from './sidebar.js';
 import { injectGalleryStyles } from './styles.js';
@@ -84,18 +84,22 @@ async function _mountCard(card) {
   if (!chartDiv) return;
   chartDiv.classList.add('ocm-card-chart-full');
 
-  const periodBar = _buildPeriodBar(card);
+  const { periodBar, headline } = _buildTopRow(card);
 
   const { data, live } = await loadData(cfg.api);
   let currentPeriod = DEFAULT_PERIOD;
 
+  // Headline always reflects the latest point — period only trims history.
+  const last = data[data.length - 1];
+  if (last) headline.textContent = fmtValBig(last.v, cfg.unit) + (live ? '' : ' (demo)');
+
   const render = period => {
     drawFullChart(chartDiv, data, cfg, period);
-    const sliced = slicePeriod(data, period);
-    const last   = sliced[sliced.length - 1];
+    const sliced    = slicePeriod(data, period);
+    const lastSliced = sliced[sliced.length - 1];
     const readingEl = card.querySelector('.ocm-card-reading');
-    if (readingEl && last) {
-      readingEl.textContent = fmtVal(last.v, cfg.unit) + (live ? '' : ' (demo)');
+    if (readingEl && lastSliced) {
+      readingEl.textContent = fmtVal(lastSliced.v, cfg.unit) + (live ? '' : ' (demo)');
     }
   };
 
@@ -112,21 +116,29 @@ async function _mountCard(card) {
   render(currentPeriod);
 }
 
-function _buildPeriodBar(card) {
+function _buildTopRow(card) {
   const meta = card.querySelector('.ocm-card-meta');
-  const bar  = document.createElement('div');
-  bar.className = 'ocm-card-periods';
+  const row  = document.createElement('div');
+  row.className = 'ocm-card-toprow';
 
+  const periodBar = document.createElement('div');
+  periodBar.className = 'ocm-card-periods';
   CARD_PERIODS.forEach(p => {
     const btn = document.createElement('span');
     btn.className   = 'ocm-card-period-btn' + (p === DEFAULT_PERIOD ? ' ocm-card-period-active' : '');
     btn.textContent = p;
     btn.dataset.period = p;
-    bar.appendChild(btn);
+    periodBar.appendChild(btn);
   });
 
-  if (meta) meta.insertAdjacentElement('afterend', bar);
-  else card.insertBefore(bar, card.firstChild);
+  const headline = document.createElement('span');
+  headline.className = 'ocm-card-headline';
 
-  return bar;
+  row.appendChild(periodBar);
+  row.appendChild(headline);
+
+  if (meta) meta.insertAdjacentElement('afterend', row);
+  else card.insertBefore(row, card.firstChild);
+
+  return { periodBar, headline };
 }

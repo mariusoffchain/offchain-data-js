@@ -61,10 +61,28 @@ export function injectGalleryStyles() {
       overflow: visible;
     }
 
+    .ocm-card-toprow {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      margin: 2px 0 8px;
+    }
+
     .ocm-card-periods {
       display: flex;
       gap: 4px;
-      margin: 2px 0 8px;
+      flex-shrink: 0;
+    }
+
+    .ocm-card-headline {
+      font-family: ${T.heading};
+      font-size: 22px;
+      font-weight: 600;
+      color: ${T.paper};
+      letter-spacing: 0.01em;
+      text-align: right;
+      white-space: nowrap;
     }
     .ocm-card-period-btn {
       font-family: ${T.heading};

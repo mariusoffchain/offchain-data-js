@@ -272,6 +272,19 @@ export function fmtVal(v, unit) {
 }
 
 /**
+ * fmtValBig(value, unit)
+ * Full-precision headline formatter — e.g. "$62,847" instead of "$63k".
+ * Used for the large current-value readout on chart cards.
+ */
+export function fmtValBig(v, unit) {
+  if (v == null) return '—';
+  if (unit === '$')   return `$${Math.round(v).toLocaleString('en-US')}`;
+  if (unit === 'BTC') return `${v.toFixed(4)} BTC`;
+  if (unit === 'K')   return Math.round(v).toLocaleString('en-US');
+  return fmtVal(v, unit);
+}
+
+/**
  * fmtDate(timestamp)
  * Formats a Unix ms timestamp as a readable date.
  */
