@@ -1,0 +1,13 @@
+{
+  "name": "offchain-data-js",
+  "version": "0.2.0",
+  "description": "Off-Chain Media — Bitcoin Data Library. JS bundle for Webflow /data page.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "dev":   "node --watch build.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.21.0"
+  }
+}

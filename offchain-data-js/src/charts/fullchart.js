@@ -1,0 +1,288 @@
+/**
+ * Full Chart — large interactive SVG for the detail view.
+ * Style: relief/pencil — drop shadow, volume gradient, wobbly edges.
+ * Supports: line, area, bar types.
+ * Features: hover tooltip, crosshair, period-aware.
+ */
+
+import { svgEl, smoothPath, sketchCircle, dataToPoints } from '../drawing.js';
+import { slicePeriod, fmtVal, fmtDate } from '../data.js';
+import { T } from '../tokens.js';
+
+// Chart canvas constants
+const W   = 680;
+const H   = 380;
+const PAD = { top: 52, right: 20, bottom: 46, left: 52 };
+const CW  = W - PAD.left - PAD.right;
+const CH  = H - PAD.top  - PAD.bottom;
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const GRID_N = 5;
+
+/**
+ * drawFullChart(container, data, cfg, period)
+ * @param {HTMLElement} container
+ * @param {Array<{ts,v}>} data     — full dataset
+ * @param {Object}        cfg      — chart config from CATALOG
+ * @param {string}        period   — "1D" | "1W" | "1M" | "3M" | "1Y" | "ALL"
+ */
+export function drawFullChart(container, data, cfg, period) {
+  container.innerHTML = '';
+
+  const sliced = slicePeriod(data, period);
+  if (!sliced.length) return;
+
+  const { points, min, max, range } = dataToPoints(sliced, PAD, CW, CH);
+
+  const svg = svgEl('svg', { width: '100%', viewBox: `0 0 ${W} ${H}`, style: 'display:block' });
+  const defs = svgEl('defs');
+
+  // ── SVG filters ────────────────────────────────────────────────
+  // Rough edges (hand-drawn wobble)
+  const roughF = svgEl('filter', { id: 'ocm-rough', x: '-5%', y: '-5%', width: '110%', height: '110%' });
+  const turb   = svgEl('feTurbulence', { type: 'fractalNoise', baseFrequency: '0.012', numOctaves: '2', seed: '4', result: 'n' });
+  const disp   = svgEl('feDisplacementMap', { in: 'SourceGraphic', in2: 'n', scale: '2', xChannelSelector: 'R', yChannelSelector: 'G' });
+  roughF.appendChild(turb);
+  roughF.appendChild(disp);
+  defs.appendChild(roughF);
+
+  // Drop shadow (relief effect)
+  const dropF  = svgEl('filter', { id: 'ocm-drop', x: '-20%', y: '-20%', width: '140%', height: '140%' });
+  const fBlur  = svgEl('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: '3', result: 'blur' });
+  const fOff   = svgEl('feOffset', { in: 'blur', dx: '2', dy: '4', result: 'off' });
+  const fComp  = svgEl('feComponentTransfer', { in: 'off', result: 'sh' });
+  fComp.appendChild(svgEl('feFuncA', { type: 'linear', slope: '0.28' }));
+  const fMerge = svgEl('feMerge');
+  fMerge.appendChild(svgEl('feMergeNode', { in: 'sh' }));
+  fMerge.appendChild(svgEl('feMergeNode', { in: 'SourceGraphic' }));
+  dropF.appendChild(fBlur);
+  dropF.appendChild(fOff);
+  dropF.appendChild(fComp);
+  dropF.appendChild(fMerge);
+  defs.appendChild(dropF);
+
+  // Volume gradient (area fill)
+  const volGrad = svgEl('linearGradient', { id: 'ocm-vol', x1: '0', y1: '0', x2: '0', y2: '1' });
+  volGrad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': T.ink, 'stop-opacity': '0.22' }));
+  volGrad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': T.ink, 'stop-opacity': '0.02' }));
+  defs.appendChild(volGrad);
+
+  // Ridge highlight (just under line)
+  const ridgeGrad = svgEl('linearGradient', { id: 'ocm-ridge', x1: '0', y1: '0', x2: '0', y2: '1' });
+  ridgeGrad.appendChild(svgEl('stop', { offset: '0%',  'stop-color': '#fff', 'stop-opacity': '0.30' }));
+  ridgeGrad.appendChild(svgEl('stop', { offset: '15%', 'stop-color': '#fff', 'stop-opacity': '0' }));
+  defs.appendChild(ridgeGrad);
+
+  // Clip path for chart area
+  const clip = svgEl('clipPath', { id: 'ocm-clip' });
+  clip.appendChild(svgEl('rect', { x: PAD.left, y: PAD.top, width: CW, height: CH }));
+  defs.appendChild(clip);
+
+  svg.appendChild(defs);
+  svg.appendChild(svgEl('rect', { width: W, height: H, fill: 'transparent' }));
+
+  // ── Grid ───────────────────────────────────────────────────────
+  for (let i = 0; i <= GRID_N; i++) {
+    const y   = PAD.top + (i / GRID_N) * CH;
+    const val = max - (i / GRID_N) * range;
+
+    svg.appendChild(svgEl('line', {
+      x1: PAD.left, y1: y, x2: PAD.left + CW, y2: y,
+      stroke: T.grid, 'stroke-width': '0.7', 'stroke-linecap': 'round',
+    }));
+
+    const lbl = svgEl('text', {
+      x: PAD.left - 8, y: y + 4,
+      'text-anchor': 'end',
+      'font-family': T.body,
+      'font-size': '10',
+      fill: 'rgba(128,128,128,0.55)',
+      'font-style': 'italic',
+    });
+    lbl.textContent = val > 1e9 ? `${(val / 1e9).toFixed(0)}B`
+                    : val > 1e6 ? `${(val / 1e6).toFixed(0)}M`
+                    : val.toFixed(1);
+    svg.appendChild(lbl);
+  }
+
+  // Baseline
+  svg.appendChild(svgEl('line', {
+    x1: PAD.left, y1: PAD.top + CH, x2: PAD.left + CW, y2: PAD.top + CH,
+    stroke: 'rgba(128,128,128,0.28)', 'stroke-width': '1', 'stroke-linecap': 'round',
+  }));
+
+  // X-axis labels
+  [0, 0.25, 0.5, 0.75, 1].forEach(t => {
+    const idx = Math.round(t * (sliced.length - 1));
+    const x   = PAD.left + t * CW;
+    const mo  = new Date(sliced[idx]?.ts || Date.now()).getMonth();
+    const lbl = svgEl('text', {
+      x, y: PAD.top + CH + 18,
+      'text-anchor': 'middle',
+      'font-family': T.body, 'font-size': '10',
+      fill: 'rgba(128,128,128,0.5)', 'font-style': 'italic',
+    });
+    lbl.textContent = MONTHS[mo];
+    svg.appendChild(lbl);
+  });
+
+  // ── Chart body ─────────────────────────────────────────────────
+  if (cfg.type === 'bar') {
+    _drawBars(svg, defs, sliced, min, range);
+  } else {
+    _drawLineCurve(svg, points, data, cfg, sliced);
+  }
+
+  // ── Branding ───────────────────────────────────────────────────
+  const wm = svgEl('text', {
+    x: W / 2, y: PAD.top + CH / 2 + 8,
+    'text-anchor': 'middle',
+    'font-family': T.heading, 'font-size': '18', 'font-weight': '600',
+    fill: T.ink, opacity: '0.04', 'letter-spacing': '0.18em',
+  });
+  wm.textContent = 'OFF-CHAIN MEDIA';
+  svg.appendChild(wm);
+
+  // Footer
+  svg.appendChild(svgEl('line', {
+    x1: 0, y1: H - 14, x2: W, y2: H - 14,
+    stroke: T.ink, 'stroke-width': '0.5', opacity: '0.3',
+  }));
+  const src = svgEl('text', {
+    x: PAD.left, y: H - 4,
+    'font-family': T.body, 'font-size': '9',
+    fill: 'rgba(128,128,128,0.4)', 'font-style': 'italic',
+  });
+  src.textContent = `Source: ${cfg.source}`;
+  svg.appendChild(src);
+
+  const url = svgEl('text', {
+    x: W - PAD.right, y: H - 4,
+    'text-anchor': 'end',
+    'font-family': T.heading, 'font-size': '8',
+    fill: 'rgba(128,128,128,0.35)', 'letter-spacing': '0.1em',
+  });
+  url.textContent = 'OFFCHAIN.MEDIA/DATA';
+  svg.appendChild(url);
+
+  container.appendChild(svg);
+}
+
+// ── Private: bar chart ─────────────────────────────────────────────
+function _drawBars(svg, defs, sliced, min, range) {
+  const gap = 3;
+  const bw  = (CW - gap * (sliced.length - 1)) / Math.max(sliced.length, 1);
+  const g   = svgEl('g', { filter: 'url(#ocm-rough)' });
+
+  sliced.forEach((d, i) => {
+    const h      = ((d.v - min) / range) * CH;
+    const x      = PAD.left + i * (bw + gap);
+    const y      = PAD.top + CH - h;
+    const isLast = i === sliced.length - 1;
+
+    const gradId = `ocm-bv-${i}`;
+    const grad   = svgEl('linearGradient', { id: gradId, x1: '0', y1: '0', x2: '0', y2: '1' });
+    grad.appendChild(svgEl('stop', { offset: '0%',   'stop-color': isLast ? T.accent : T.ink, 'stop-opacity': isLast ? '1' : '0.85' }));
+    grad.appendChild(svgEl('stop', { offset: '100%', 'stop-color': isLast ? T.accent : T.ink, 'stop-opacity': isLast ? '0.75' : '0.6' }));
+    defs.appendChild(grad);
+
+    const barG = svgEl('g', { filter: 'url(#ocm-drop)' });
+    barG.appendChild(svgEl('rect', { x, y, width: bw, height: h, rx: '1.5', fill: `url(#${gradId})` }));
+    barG.appendChild(svgEl('rect', { x, y, width: bw, height: Math.min(h, 16), rx: '1.5', fill: 'rgba(255,255,255,0.28)' }));
+    g.appendChild(barG);
+  });
+
+  svg.appendChild(g);
+}
+
+// ── Private: line/area chart with hover tooltip ────────────────────
+function _drawLineCurve(svg, points, data, cfg, sliced) {
+  const linePath  = smoothPath(points, 1.0, 3);
+  const areaPath  = `${linePath} L${points[points.length-1].x},${PAD.top+CH} L${points[0].x},${PAD.top+CH} Z`;
+
+  // Area fill
+  const areaG = svgEl('g', { 'clip-path': 'url(#ocm-clip)' });
+  areaG.appendChild(svgEl('path', { d: areaPath, fill: 'url(#ocm-vol)' }));
+  areaG.appendChild(svgEl('path', { d: areaPath, fill: 'url(#ocm-ridge)' }));
+  svg.appendChild(areaG);
+
+  // Curves with filter
+  const curveG = svgEl('g', { filter: 'url(#ocm-rough)', 'clip-path': 'url(#ocm-clip)' });
+  curveG.appendChild(svgEl('path', { d: linePath, fill: 'none', stroke: T.ink, 'stroke-width': '2.2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', filter: 'url(#ocm-drop)' }));
+
+  if (points.length > 12) {
+    curveG.appendChild(svgEl('path', {
+      d: smoothPath(points.slice(-12), 1.0, 4),
+      fill: 'none', stroke: T.accent, 'stroke-width': '2.5',
+      'stroke-linecap': 'round', filter: 'url(#ocm-drop)',
+    }));
+  }
+  svg.appendChild(curveG);
+
+  // End point marker
+  const last = points[points.length - 1];
+  if (last) {
+    svg.appendChild(svgEl('circle', { cx: last.x, cy: last.y, r: '4', fill: T.accent }));
+    svg.appendChild(svgEl('path', {
+      d: sketchCircle(last.x, last.y, 9),
+      fill: 'none', stroke: T.accent, 'stroke-width': '1.2',
+      opacity: '0.6', 'stroke-linecap': 'round',
+    }));
+  }
+
+  // Hover elements
+  const hoverLine = svgEl('line', {
+    x1: 0, y1: PAD.top, x2: 0, y2: PAD.top + CH,
+    stroke: T.accent, 'stroke-width': '0.7', 'stroke-dasharray': '3,3',
+    opacity: '0', 'pointer-events': 'none',
+  });
+  svg.appendChild(hoverLine);
+
+  const tooltipG = svgEl('g', { opacity: '0', 'pointer-events': 'none' });
+  const ttBox    = svgEl('rect', { x: 0, y: 0, width: 130, height: 42, rx: '2', fill: T.ink });
+  const ttDate   = svgEl('text', { x: 10, y: 14, 'font-family': T.body, 'font-size': '10', fill: 'rgba(255,255,255,0.55)', 'font-style': 'italic' });
+  const ttVal    = svgEl('text', { x: 10, y: 32, 'font-family': T.heading, 'font-size': '14', 'font-weight': '600', fill: '#fff' });
+  tooltipG.appendChild(ttBox);
+  tooltipG.appendChild(ttDate);
+  tooltipG.appendChild(ttVal);
+  svg.appendChild(tooltipG);
+
+  // Invisible hit area for mouse events
+  const hitArea = svgEl('rect', {
+    x: PAD.left, y: PAD.top, width: CW, height: CH,
+    fill: 'transparent', style: 'cursor:crosshair',
+  });
+
+  hitArea.addEventListener('mousemove', e => {
+    const rect   = svg.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const mx     = (e.clientX - rect.left) * scaleX;
+
+    let nearest = points[0];
+    let minDist = Infinity;
+    points.forEach(p => {
+      const d = Math.abs(p.x - mx);
+      if (d < minDist) { minDist = d; nearest = p; }
+    });
+
+    hoverLine.setAttribute('x1', nearest.x);
+    hoverLine.setAttribute('x2', nearest.x);
+    hoverLine.setAttribute('opacity', '0.5');
+
+    const tx = Math.min(nearest.x + 8, W - 140);
+    const ty = Math.max(nearest.y - 52, PAD.top);
+    ttBox.setAttribute('x', tx);  ttBox.setAttribute('y', ty);
+    ttDate.setAttribute('x', tx + 10); ttDate.setAttribute('y', ty + 14);
+    ttVal.setAttribute('x',  tx + 10); ttVal.setAttribute('y',  ty + 32);
+    ttDate.textContent = fmtDate(nearest.d.ts);
+    ttVal.textContent  = fmtVal(nearest.d.v, cfg.unit);
+    tooltipG.setAttribute('opacity', '1');
+  });
+
+  hitArea.addEventListener('mouseleave', () => {
+    hoverLine.setAttribute('opacity', '0');
+    tooltipG.setAttribute('opacity', '0');
+  });
+
+  svg.appendChild(hitArea);
+}
