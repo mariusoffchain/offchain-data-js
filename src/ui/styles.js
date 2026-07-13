@@ -35,10 +35,8 @@ export function injectGalleryStyles() {
       display: flex;
       align-items: center;
       color: ${T.textAdaptiveMuted};
-      font-size: 20px;
       padding: 0 16px;
     }
-    .ocm-blockstrip-divider::before { content: '⛏️'; }
 
     .ocm-block-cube {
       position: relative;

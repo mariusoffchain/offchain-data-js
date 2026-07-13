@@ -60,6 +60,7 @@ function _render(strip) {
 
   const divider = document.createElement('div');
   divider.className = 'ocm-blockstrip-divider';
+  divider.appendChild(_pickaxeIcon());
   strip.appendChild(divider);
 
   lastConfirmed.forEach(b => {
@@ -69,6 +70,19 @@ function _render(strip) {
       meta: `${b.height.toLocaleString('en-US')} · ${fmtTimeAgo(b.timestamp)} · ${b.extras.pool.name}`,
     }));
   });
+}
+
+// Hand-drawn line icon, not a system emoji — renders identically
+// everywhere and inherits the divider's adaptive text color.
+function _pickaxeIcon() {
+  const svg = svgEl('svg', {
+    viewBox: '0 0 24 24', width: '22', height: '22',
+    fill: 'none', stroke: 'currentColor',
+    'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+  });
+  svg.appendChild(svgEl('path', { d: 'M5 19 L14 9' }));
+  svg.appendChild(svgEl('path', { d: 'M8.5 5.5 Q14 2.5 19.5 8 Q14 10.5 9 12.5' }));
+  return svg;
 }
 
 function _cube(kind, d) {
