@@ -19,28 +19,33 @@ export function injectGalleryStyles() {
 
     .ocm-blockstrip {
       display: flex;
-      align-items: flex-start;
+      align-items: stretch;
       gap: 18px;
       overflow-x: auto;
       padding: 24px 4px 28px;
       margin-bottom: 8px;
     }
+    .ocm-blockstrip.ocm-blockstrip--reversed { flex-direction: row-reverse; }
 
     .ocm-blockstrip-divider {
       flex: 0 0 auto;
-      align-self: stretch;
+      align-self: center;
       display: flex;
       align-items: center;
       color: ${T.textAdaptiveMuted};
       font-size: 18px;
-      padding: 0 2px;
+      padding: 0 6px;
+      cursor: pointer;
+      transition: color 0.15s;
     }
+    .ocm-blockstrip-divider:hover { color: ${T.textAdaptive}; }
     .ocm-blockstrip-divider::before { content: '⇄'; }
 
     .ocm-block-cube {
       position: relative;
       flex: 0 0 auto;
       width: 150px;
+      height: 152px;
     }
     .ocm-block-cube-bg {
       position: absolute;
@@ -51,7 +56,11 @@ export function injectGalleryStyles() {
     }
     .ocm-block-cube-content {
       position: relative;
-      padding: 18px 16px 12px 12px;
+      height: 100%;
+      box-sizing: border-box;
+      padding: 22px 20px 16px 18px;
+      display: flex;
+      flex-direction: column;
     }
 
     .ocm-block-cube--pending .ocm-bc-fee,
@@ -87,6 +96,11 @@ export function injectGalleryStyles() {
       font-size: 10px;
       opacity: 0.75;
       margin: 8px 0 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: auto;
+      padding-top: 8px;
     }
 
     .ocm-gallery-view {

@@ -51,6 +51,10 @@ async function _refresh(strip) {
 
   const divider = document.createElement('div');
   divider.className = 'ocm-blockstrip-divider';
+  divider.title = 'Reverse order';
+  divider.addEventListener('click', () => {
+    strip.classList.toggle('ocm-blockstrip--reversed');
+  });
   strip.appendChild(divider);
 
   confirmed.slice(0, 8).forEach(b => {
