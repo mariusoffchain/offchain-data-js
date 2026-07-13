@@ -78,10 +78,10 @@ function _pickaxeIcon() {
   const svg = svgEl('svg', {
     viewBox: '0 0 24 24', width: '22', height: '22',
     fill: 'none', stroke: 'currentColor',
-    'stroke-width': '1.6', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+    'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round',
   });
-  svg.appendChild(svgEl('path', { d: 'M5 19 L14 9' }));
-  svg.appendChild(svgEl('path', { d: 'M8.5 5.5 Q14 2.5 19.5 8 Q14 10.5 9 12.5' }));
+  svg.appendChild(svgEl('path', { d: 'M6 21 L15 9' }));      // handle
+  svg.appendChild(svgEl('path', { d: 'M9 4 L15 9 L20 12' })); // angular pick head
   return svg;
 }
 
