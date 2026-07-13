@@ -26,6 +26,16 @@ const MEMPOOL_BASE = 'https://ocm-proxy.mariusoffchain.workers.dev';
 // then `npm run build` and push.
 const COINGECKO_API_KEY = '';
 
+// Coin Metrics Community API — free, no key, open CORS. Covers metrics
+// Glassnode would otherwise charge for (active addresses, exchange
+// supply, tx count).
+const COINMETRICS_BASE = 'https://community-api.coinmetrics.io/v4/timeseries/asset-metrics';
+
+// Current block subsidy (post-2024 halving). Stable until the next
+// halving around block 1,050,000 (~2028) — revisit this constant then.
+const BLOCK_SUBSIDY_BTC = 3.125;
+const BLOCKS_PER_DAY    = 144;
+
 // ─── In-memory cache (keyed by api id) ───────────────────────────
 const cache = {};
 
@@ -120,6 +130,60 @@ async function fetchMempool() {
   })));
 }
 
+async function fetchBlockWeight() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/sizes-weights/1y`);
+  if (!r.ok) throw new Error(`blockweight HTTP ${r.status}`);
+  const j = await r.json(); // { weights: [{ timestamp, avgWeight (WU) }, ...] }
+  return dailyAvg(j.weights.map(d => ({ ts: d.timestamp * 1000, v: d.avgWeight / 1e6 })));
+}
+
+// Coin Metrics: one metric per call, browser-fetchable directly (no proxy).
+async function fetchCoinMetric(metric) {
+  const end   = new Date();
+  const start = new Date(end - 370 * 86_400_000);
+  const url = `${COINMETRICS_BASE}?assets=btc&metrics=${metric}&frequency=1d`
+    + `&start_time=${start.toISOString().slice(0, 10)}&end_time=${end.toISOString().slice(0, 10)}`
+    + `&page_size=10000`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${metric} HTTP ${r.status}`);
+  const j = await r.json();
+  return j.data.map(d => ({ ts: new Date(d.time).getTime(), v: parseFloat(d[metric]) }));
+}
+
+async function fetchAddresses() {
+  return (await fetchCoinMetric('AdrActCnt')).map(({ ts, v }) => ({ ts, v: v / 1_000 }));
+}
+
+async function fetchTps() {
+  return (await fetchCoinMetric('TxCnt')).map(({ ts, v }) => ({ ts, v: v / 86_400 }));
+}
+
+async function fetchExchangeBalance() {
+  return (await fetchCoinMetric('SplyExNtv')).map(({ ts, v }) => ({ ts, v: v / 1_000_000 }));
+}
+
+// Derived, not fetched: daily miner revenue per TH/s, from data other
+// fetchers already pull (avoids a 4th network dependency for one chart).
+async function fetchHashPrice() {
+  const [{ data: fees }, { data: hash }, { data: price }] = await Promise.all([
+    loadData('fees'),
+    loadData('hashrate'),
+    loadData('price'),
+  ]);
+  const hashByDay  = new Map(hash.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
+  const priceByDay = new Map(price.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
+  return fees
+    .map(({ ts, v: avgFeeBtc }) => {
+      const day = Math.floor(ts / 86_400_000);
+      const hashrate = hashByDay.get(day);
+      const usd      = priceByDay.get(day);
+      if (hashrate == null || usd == null) return null;
+      const dailyRevenueUsd = BLOCKS_PER_DAY * (BLOCK_SUBSIDY_BTC + avgFeeBtc) * usd;
+      return { ts, v: dailyRevenueUsd / (hashrate * 1e6) }; // EH/s → TH/s
+    })
+    .filter(Boolean);
+}
+
 // CoinGecko: fetch market chart once, split into price / marketcap / volume
 async function fetchMarketChart() {
   if (cache._market) return cache._market;
@@ -137,15 +201,21 @@ async function fetchMarketChart() {
 
 // Map api id → async fetcher function
 const FETCHERS = {
-  hashrate:   fetchHashrate,
-  difficulty: fetchDifficulty,
-  fees:       fetchBlockFees,
-  feerates:   fetchFeeRates,
-  mempool:    fetchMempool,
-  price:      async () => (await fetchMarketChart()).price,
-  marketcap:  async () => (await fetchMarketChart()).marketcap,
-  volume:     async () => (await fetchMarketChart()).volume,
-  // Add more fetchers here as APIs become available (Glassnode: paid key)
+  hashrate:    fetchHashrate,
+  difficulty:  fetchDifficulty,
+  fees:        fetchBlockFees,
+  feerates:    fetchFeeRates,
+  mempool:     fetchMempool,
+  blockweight: fetchBlockWeight,
+  addresses:   fetchAddresses,
+  tps:         fetchTps,
+  exchange:    fetchExchangeBalance,
+  hashprice:   fetchHashPrice,
+  price:       async () => (await fetchMarketChart()).price,
+  marketcap:   async () => (await fetchMarketChart()).marketcap,
+  volume:      async () => (await fetchMarketChart()).volume,
+  // Remaining mock: dominance (no free historical source found),
+  // lth + nvt (Glassnode-proprietary, needs a paid key)
 };
 
 // ─── Public API ───────────────────────────────────────────────────

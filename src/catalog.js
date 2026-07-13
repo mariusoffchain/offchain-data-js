@@ -106,7 +106,7 @@ export const CATALOG = [
     type:     'area',
     api:      'addresses',
     unit:     'K',
-    source:   'Glassnode',
+    source:   'Coin Metrics',
   },
   {
     id:       'lth-supply',
@@ -126,7 +126,7 @@ export const CATALOG = [
     type:     'line',
     api:      'exchange',
     unit:     'M BTC',
-    source:   'Glassnode',
+    source:   'Coin Metrics',
   },
   {
     id:       'nvt',
@@ -168,7 +168,7 @@ export const CATALOG = [
     type:     'line',
     api:      'tps',
     unit:     'tx/s',
-    source:   'mempool.space',
+    source:   'Coin Metrics',
   },
   {
     id:       'block-weight',
