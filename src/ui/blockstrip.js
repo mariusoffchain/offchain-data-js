@@ -8,10 +8,9 @@
  * always line up regardless of card size (no CSS skew/transform
  * approximation).
  *
- * Layout: two equal-width panes (pending / confirmed) each scroll
- * independently, so the divider between them always sits at the
- * horizontal center of the strip regardless of how many blocks are
- * on either side.
+ * Layout: one continuous horizontally-scrolling row — pending blocks,
+ * a static pickaxe divider, confirmed blocks — matching mempool.space
+ * (a single strip, not two independently-scrollable halves).
  */
 
 import { svgEl } from '../drawing.js';
@@ -30,20 +29,6 @@ export function initBlockStrip() {
 
   const strip = document.createElement('div');
   strip.className = 'ocm-blockstrip';
-
-  const pendingPane = document.createElement('div');
-  pendingPane.className = 'ocm-blockstrip-pane ocm-blockstrip-pane--pending';
-
-  // Purely visual pivot between pending and confirmed — not a control.
-  const divider = document.createElement('div');
-  divider.className = 'ocm-blockstrip-divider';
-
-  const confirmedPane = document.createElement('div');
-  confirmedPane.className = 'ocm-blockstrip-pane ocm-blockstrip-pane--confirmed';
-
-  strip.appendChild(pendingPane);
-  strip.appendChild(divider);
-  strip.appendChild(confirmedPane);
   host.parentElement.insertBefore(strip, host);
 
   const fetchAndRender = async () => {
@@ -53,30 +38,32 @@ export function initBlockStrip() {
     ]);
     lastPending   = pending.slice(0, 3).map((b, i) => ({ ...b, _index: i }));
     lastConfirmed = confirmed.slice(0, 8);
-    _render(pendingPane, confirmedPane);
+    _render(strip);
   };
 
   fetchAndRender();
   setInterval(fetchAndRender, REFRESH_MS);
 }
 
-function _render(pendingPane, confirmedPane) {
-  pendingPane.innerHTML   = '';
-  confirmedPane.innerHTML = '';
+function _render(strip) {
+  strip.innerHTML = '';
 
-  // Pending: soonest block (index 0) sits last, i.e. closest to the
-  // divider (pane is right-aligned). Confirmed: API order is already
-  // newest-first, so the most recent block sits first, closest to
-  // the divider on the other side.
+  // Soonest pending block (index 0) sits last, i.e. closest to the
+  // divider; confirmed API order is already newest-first, so the most
+  // recent block sits right after the divider on the other side.
   [...lastPending].reverse().forEach(b => {
-    pendingPane.appendChild(_cube('pending', {
+    strip.appendChild(_cube('pending', {
       fee: b.medianFee, range: b.feeRange, fees: b.totalFees,
       txs: b.nTx, size: b.blockSize, meta: `in ~${(b._index + 1) * 10} min`,
     }));
   });
 
+  const divider = document.createElement('div');
+  divider.className = 'ocm-blockstrip-divider';
+  strip.appendChild(divider);
+
   lastConfirmed.forEach(b => {
-    confirmedPane.appendChild(_cube('confirmed', {
+    strip.appendChild(_cube('confirmed', {
       fee: b.extras.medianFee, range: b.extras.feeRange, fees: b.extras.totalFees,
       txs: b.tx_count, size: b.size,
       meta: `${b.height.toLocaleString('en-US')} · ${fmtTimeAgo(b.timestamp)} · ${b.extras.pool.name}`,

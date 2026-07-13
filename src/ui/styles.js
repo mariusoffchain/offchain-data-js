@@ -20,19 +20,11 @@ export function injectGalleryStyles() {
     .ocm-blockstrip {
       display: flex;
       align-items: stretch;
+      gap: 18px;
+      overflow-x: auto;
       padding: 24px 4px 28px;
       margin-bottom: 8px;
     }
-
-    .ocm-blockstrip-pane {
-      flex: 1 1 0;
-      min-width: 0;
-      display: flex;
-      align-items: stretch;
-      gap: 18px;
-      overflow-x: auto;
-    }
-    .ocm-blockstrip-pane--pending { justify-content: flex-end; }
 
     .ocm-blockstrip-divider {
       flex: 0 0 auto;
