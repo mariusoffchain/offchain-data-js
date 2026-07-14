@@ -20,6 +20,12 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const GRID_N = 5;
 let _wmId = 0;
 
+const SOURCE_URLS = {
+  'Coin Metrics':  'https://coinmetrics.io',
+  'mempool.space': 'https://mempool.space',
+  'CoinGecko':     'https://www.coingecko.com',
+};
+
 /**
  * drawFullChart(container, data, cfg, period)
  * @param {HTMLElement} container
@@ -154,25 +160,35 @@ export function drawFullChart(container, data, cfg, period) {
 
   // Footer
   svg.appendChild(svgEl('line', {
-    x1: 0, y1: H - 14, x2: W, y2: H - 14,
+    x1: 0, y1: H - 16, x2: W, y2: H - 16,
     stroke: T.ink, 'stroke-width': '0.5', opacity: '0.3',
   }));
-  const src = svgEl('text', {
-    x: PAD.left, y: H - 4,
-    'font-family': T.body, 'font-size': '9',
-    fill: 'rgba(128,128,128,0.4)', 'font-style': 'italic',
-  });
-  src.textContent = `Source: ${cfg.source}`;
-  svg.appendChild(src);
 
-  const url = svgEl('text', {
+  const srcLink = svgEl('a', {
+    href: SOURCE_URLS[cfg.source] || '#',
+    target: '_blank',
+    style: 'cursor:pointer',
+  });
+  const srcTxt = svgEl('text', {
+    x: PAD.left, y: H - 4,
+    'font-family': T.body, 'font-size': '11',
+    fill: 'rgba(128,128,128,0.55)', 'font-style': 'italic',
+    style: 'transition:fill 0.15s',
+  });
+  srcTxt.textContent = `Source: ${cfg.source} ↗`;
+  srcLink.addEventListener('mouseenter', () => srcTxt.setAttribute('fill', T.accent));
+  srcLink.addEventListener('mouseleave', () => srcTxt.setAttribute('fill', 'rgba(128,128,128,0.55)'));
+  srcLink.appendChild(srcTxt);
+  svg.appendChild(srcLink);
+
+  const urlTxt = svgEl('text', {
     x: W - PAD.right, y: H - 4,
     'text-anchor': 'end',
-    'font-family': T.heading, 'font-size': '8',
-    fill: 'rgba(128,128,128,0.35)', 'letter-spacing': '0.1em',
+    'font-family': T.heading, 'font-size': '10',
+    fill: 'rgba(128,128,128,0.45)', 'letter-spacing': '0.1em',
   });
-  url.textContent = 'OFFCHAIN.MEDIA/DATA';
-  svg.appendChild(url);
+  urlTxt.textContent = 'OFFCHAIN.MEDIA/DATA';
+  svg.appendChild(urlTxt);
 
   container.appendChild(svg);
 }
