@@ -6,7 +6,7 @@
  */
 
 import { svgEl, smoothPath, sketchCircle, dataToPoints } from '../drawing.js';
-import { slicePeriod, fmtVal, fmtDate } from '../data.js';
+import { slicePeriod, fmtVal, fmtValTooltip, fmtDate } from '../data.js';
 import { T } from '../tokens.js';
 
 // Chart canvas constants
@@ -285,7 +285,7 @@ function _drawLineCurve(svg, points, data, cfg, sliced) {
     ttDate.setAttribute('x', tx + 10); ttDate.setAttribute('y', ty + 14);
     ttVal.setAttribute('x',  tx + 10); ttVal.setAttribute('y',  ty + 32);
     ttDate.textContent = fmtDate(nearest.d.ts);
-    ttVal.textContent  = fmtVal(nearest.d.v, cfg.unit);
+    ttVal.textContent  = fmtValTooltip(nearest.d.v, cfg.unit);
     tooltipG.setAttribute('opacity', '1');
   });
 

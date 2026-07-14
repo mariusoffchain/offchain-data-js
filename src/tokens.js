@@ -31,5 +31,5 @@ export const PERIOD_N = {
   '1M':  30,
   '3M':  90,
   '1Y':  365,
-  'ALL': 2000,
+  'ALL': 9999,
 };

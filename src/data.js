@@ -92,14 +92,14 @@ function dailyAvg(points) {
 }
 
 async function fetchHashrate() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/hashrate/3y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/hashrate/all`);
   if (!r.ok) throw new Error(`hashrate HTTP ${r.status}`);
   const j = await r.json();
   return j.hashrates.map(d => ({ ts: d.timestamp * 1000, v: d.avgHashrate / 1e18 }));
 }
 
 async function fetchDifficulty() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/difficulty-adjustments/3y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/difficulty-adjustments/all`);
   if (!r.ok) throw new Error(`difficulty HTTP ${r.status}`);
   const j = await r.json(); // [[ts_s, height, difficulty, adjustment], ...] newest first
   return j
@@ -108,21 +108,21 @@ async function fetchDifficulty() {
 }
 
 async function fetchBlockFees() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fees/3y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fees/all`);
   if (!r.ok) throw new Error(`fees HTTP ${r.status}`);
   const j = await r.json(); // [{ timestamp, avgFees (sats) }, ...]
   return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFees / 1e8 })));
 }
 
 async function fetchFeeRates() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fee-rates/3y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fee-rates/all`);
   if (!r.ok) throw new Error(`feerates HTTP ${r.status}`);
   const j = await r.json(); // [{ timestamp, avgFee_50 (sat/vB) }, ...]
   return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFee_50 })));
 }
 
 async function fetchMempool() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/statistics/3y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/statistics/all`);
   if (!r.ok) throw new Error(`mempool HTTP ${r.status}`);
   const j = await r.json(); // [{ added (ts_s), vsizes: [vB per fee bucket] }, ...] newest first
   return dailyAvg(j.map(d => ({
@@ -132,7 +132,7 @@ async function fetchMempool() {
 }
 
 async function fetchBlockWeight() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/sizes-weights/3y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/sizes-weights/all`);
   if (!r.ok) throw new Error(`blockweight HTTP ${r.status}`);
   const j = await r.json(); // { weights: [{ timestamp, avgWeight (WU) }, ...] }
   return dailyAvg(j.weights.map(d => ({ ts: d.timestamp * 1000, v: d.avgWeight / 1e6 })));
@@ -143,7 +143,7 @@ async function fetchBlockWeight() {
 async function fetchCoinMetric(metric) {
   if (_cmCache[metric]) return _cmCache[metric];
   const end   = new Date();
-  const start = new Date(end - 1825 * 86_400_000); // 5 years
+  const start = new Date('2010-01-01'); // earliest market price data available
   const url = `${COINMETRICS_BASE}?assets=btc&metrics=${metric}&frequency=1d`
     + `&start_time=${start.toISOString().slice(0, 10)}&end_time=${end.toISOString().slice(0, 10)}`
     + `&page_size=10000`;
@@ -156,7 +156,7 @@ async function fetchCoinMetric(metric) {
 }
 
 async function fetchAddresses() {
-  return (await fetchCoinMetric('AdrActCnt')).map(({ ts, v }) => ({ ts, v: v / 1_000 }));
+  return fetchCoinMetric('AdrActCnt'); // raw count; fmtVal('K') divides by 1000
 }
 
 async function fetchTps() {
@@ -390,6 +390,31 @@ export function fmtValBig(v, unit) {
   if (unit === 'BTC') return `${v.toFixed(4)} BTC`;
   if (unit === 'K')   return Math.round(v).toLocaleString('en-US');
   return fmtVal(v, unit);
+}
+
+/**
+ * fmtValTooltip(value, unit)
+ * High-precision formatter for hover tooltips — shows more decimals than fmtVal.
+ */
+export function fmtValTooltip(v, unit) {
+  if (v == null) return '—';
+  if (unit === '$') {
+    if (v >= 1_000) return `$${Math.round(v).toLocaleString('en-US')}`;
+    if (v >= 1)     return `$${v.toFixed(2)}`;
+    return `$${v.toFixed(5)}`;
+  }
+  if (unit === '$T')    return `$${v.toFixed(3)}T`;
+  if (unit === '$B')    return `$${v.toFixed(2)}B`;
+  if (unit === 'EH/s')  return `${v.toFixed(2)} EH/s`;
+  if (unit === 'M BTC') return `${v.toFixed(3)}M BTC`;
+  if (unit === 'K')     return `${Math.round(v).toLocaleString('en-US')}`;
+  if (unit === 'BTC')   return `${v.toFixed(4)} BTC`;
+  if (unit === 'T')     return `${v.toFixed(2)}T`;
+  if (unit === '%')     return `${v.toFixed(2)}%`;
+  // adaptive precision for sat/vB, tx/s, MWU, MB, $/TH …
+  const a = Math.abs(v);
+  const dp = a >= 100 ? 1 : a >= 10 ? 2 : a >= 1 ? 3 : a >= 0.1 ? 4 : 5;
+  return `${v.toFixed(dp)}${unit ? ' ' + unit : ''}`;
 }
 
 /**
