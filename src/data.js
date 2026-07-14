@@ -58,15 +58,15 @@ const MOCK = {
   price:      () => mockSeries(5,  365, 85_000,   4_000,   120),
   marketcap:  () => mockSeries(7,  365, 1.6e12,   8e10,    3e9),
   volume:     () => mockSeries(13, 365, 35e9,     8e9,     1e8),
-  dominance:  () => mockSeries(6,  365, 55,       3,       0.02),
+  dominance:  () => mockSeries(6,  365, 19.8,     0.05,    0.001),
   hashrate:   () => mockSeries(3,  365, 600,      25,      0.6),
   difficulty: () => mockSeries(9,  52,  80,       5,       0.15),
   fees:       () => mockSeries(11, 90,  0.15,     0.05,    0.001),
   hashprice:  () => mockSeries(12, 180, 0.042,    0.008,   0.0001),
   addresses:  () => mockSeries(14, 365, 900_000,  80_000,  500),
-  lth:        () => mockSeries(13, 365, 14.2,     0.3,     0.003),
+  lth:        () => mockSeries(13, 365, 500,      30,      0.5),
   exchange:   () => mockSeries(15, 365, 2.8,      0.04,   -0.001),
-  nvt:        () => mockSeries(16, 365, 65,       8,       0.02),
+  nvt:        () => mockSeries(16, 365, 600_000,  50_000,  100),
   mempool:    () => mockSeries(17, 90,  35,       18,      0.05),
   feerates:   () => mockSeries(18, 90,  15,       10,      0.02),
   tps:        () => mockSeries(19, 90,  5.5,      1,       0.002),
@@ -208,54 +208,30 @@ async function fetchVolume() {
   return j.total_volumes.map(([ts, v]) => ({ ts, v: v / 1e9 }));
 }
 
-// BTC dominance: Coin Metrics BTC market cap ÷ CoinGecko total crypto market cap.
-async function fetchDominance() {
-  const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
-  const [btcCap, globalR] = await Promise.all([
-    fetchCoinMetric('CapMrktCurUSD'),
-    fetch(`https://api.coingecko.com/api/v3/global/market_cap_chart?days=365${key}`)
-      .then(r => { if (!r.ok) throw new Error(`CoinGecko global HTTP ${r.status}`); return r.json(); }),
-  ]);
-  const totalByDay = new Map(
-    globalR.market_cap_chart.market_cap.map(([ts, v]) => [Math.floor(ts / 86_400_000), v])
-  );
-  return btcCap
-    .map(({ ts, v }) => {
-      const total = totalByDay.get(Math.floor(ts / 86_400_000));
-      return total ? { ts, v: (v / total) * 100 } : null;
-    })
-    .filter(Boolean);
+// Circulating Supply — SplyCur / 1e6 → M BTC.
+// Replaces BTC dominance (no free historical dominance source exists).
+async function fetchCircSupply() {
+  return (await fetchCoinMetric('SplyCur')).map(d => ({ ts: d.ts, v: d.v / 1e6 }));
 }
 
-// NVT ratio: market cap ÷ adjusted on-chain transfer volume — both free on Coin Metrics.
-async function fetchNvt() {
-  const [cap, vol] = await Promise.all([
-    fetchCoinMetric('CapMrktCurUSD'),
-    fetchCoinMetric('TxTfrValAdjUSD'),
-  ]);
-  const volByDay = new Map(vol.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
-  return cap
-    .map(({ ts, v: capVal }) => {
-      const txVol = volByDay.get(Math.floor(ts / 86_400_000));
-      return (txVol && txVol > 0) ? { ts, v: capVal / txVol } : null;
-    })
-    .filter(Boolean);
+// Daily transaction count — raw TxCnt; fmtVal('K') divides by 1000 for display.
+// Replaces NVT (TxTfrValAdjUSD is paywalled on Coin Metrics community plan).
+async function fetchTxCount() {
+  return fetchCoinMetric('TxCnt');
 }
 
-// Long-Term Holder Supply proxy: coins not transacted in 1+ year (SplyCur − SplyAct1yr).
-// Free on Coin Metrics Community API — no Glassnode key required.
-async function fetchLth() {
-  const [total, active1yr] = await Promise.all([
-    fetchCoinMetric('SplyCur'),
-    fetchCoinMetric('SplyAct1yr'),
+// Daily miner revenue: block subsidy (IssTotNtv) + fees (FeeTotNtv), in BTC.
+// Replaces LTH Supply (SplyAct1yr is paywalled on Coin Metrics community plan).
+async function fetchMinerRevenue() {
+  const [issuance, fees] = await Promise.all([
+    fetchCoinMetric('IssTotNtv'),
+    fetchCoinMetric('FeeTotNtv'),
   ]);
-  const actByDay = new Map(active1yr.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
-  return total
-    .map(({ ts, v }) => {
-      const act = actByDay.get(Math.floor(ts / 86_400_000));
-      return act != null ? { ts, v: (v - act) / 1e6 } : null; // → M BTC
-    })
-    .filter(Boolean);
+  const feeByDay = new Map(fees.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
+  return issuance.map(({ ts, v: iss }) => ({
+    ts,
+    v: iss + (feeByDay.get(Math.floor(ts / 86_400_000)) ?? 0),
+  }));
 }
 
 // ─── Block explorer strip (mempool + confirmed blocks) ────────────
@@ -345,9 +321,9 @@ const FETCHERS = {
   price:       fetchPrice,
   marketcap:   fetchMarketCap,
   volume:      fetchVolume,
-  dominance:   fetchDominance,
-  nvt:         fetchNvt,
-  lth:         fetchLth,
+  dominance:   fetchCircSupply,
+  nvt:         fetchTxCount,
+  lth:         fetchMinerRevenue,
 };
 
 // ─── Public API ───────────────────────────────────────────────────

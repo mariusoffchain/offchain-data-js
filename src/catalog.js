@@ -46,13 +46,13 @@ export const CATALOG = [
   },
   {
     id:       'dominance',
-    title:    'BTC Dominance',
-    subtitle: 'Share of total crypto market cap',
+    title:    'Circulating Supply',
+    subtitle: 'Total BTC mined to date',
     category: 'market',
-    type:     'line',
+    type:     'area',
     api:      'dominance',
-    unit:     '%',
-    source:   'Coin Metrics / CoinGecko',
+    unit:     'M BTC',
+    source:   'Coin Metrics',
   },
 
   // ── MINING ─────────────────────────────────────────────────────
@@ -110,12 +110,12 @@ export const CATALOG = [
   },
   {
     id:       'lth-supply',
-    title:    'Long-Term Holder Supply',
-    subtitle: 'BTC inactive for 1+ year',
+    title:    'Miner Revenue',
+    subtitle: 'Daily BTC earned by miners (subsidy + fees)',
     category: 'on-chain',
     type:     'area',
     api:      'lth',
-    unit:     'M BTC',
+    unit:     'BTC',
     source:   'Coin Metrics',
   },
   {
@@ -130,12 +130,12 @@ export const CATALOG = [
   },
   {
     id:       'nvt',
-    title:    'NVT Ratio',
-    subtitle: 'Market cap ÷ on-chain transfer volume',
+    title:    'Daily Transactions',
+    subtitle: 'On-chain transaction count per day',
     category: 'on-chain',
-    type:     'line',
+    type:     'bar',
     api:      'nvt',
-    unit:     '',
+    unit:     'K',
     source:   'Coin Metrics',
   },
 
