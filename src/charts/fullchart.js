@@ -167,7 +167,7 @@ export function drawFullChart(container, data, cfg, period) {
   const srcLink = svgEl('a', {
     href: SOURCE_URLS[cfg.source] || '#',
     target: '_blank',
-    style: 'cursor:pointer',
+    style: 'cursor:pointer; text-decoration:none',
   });
   const srcTxt = svgEl('text', {
     x: PAD.left, y: H - 4,
@@ -175,7 +175,7 @@ export function drawFullChart(container, data, cfg, period) {
     fill: 'rgba(128,128,128,0.55)', 'font-style': 'italic',
     style: 'transition:fill 0.15s',
   });
-  srcTxt.textContent = `Source: ${cfg.source} ↗`;
+  srcTxt.textContent = `Source: ${cfg.source}`;
   srcLink.addEventListener('mouseenter', () => srcTxt.setAttribute('fill', T.accent));
   srcLink.addEventListener('mouseleave', () => srcTxt.setAttribute('fill', 'rgba(128,128,128,0.55)'));
   srcLink.appendChild(srcTxt);
