@@ -17,27 +17,27 @@ export const CATALOG = [
   {
     id:       'btc-price',
     title:    'Bitcoin Price',
-    subtitle: 'BTC/USD spot price',
+    subtitle: 'BTC/USD daily reference rate',
     category: 'market',
     type:     'line',
     api:      'price',
     unit:     '$',
-    source:   'CoinGecko',
+    source:   'Coin Metrics',
   },
   {
     id:       'market-cap',
     title:    'Market Capitalization',
-    subtitle: 'Total BTC market value',
+    subtitle: 'Total BTC market value in USD',
     category: 'market',
     type:     'area',
     api:      'marketcap',
     unit:     '$T',
-    source:   'CoinGecko',
+    source:   'Coin Metrics',
   },
   {
     id:       'volume',
     title:    '24h Trading Volume',
-    subtitle: 'Aggregate spot volume',
+    subtitle: 'Aggregate exchange spot volume',
     category: 'market',
     type:     'bar',
     api:      'volume',
@@ -52,7 +52,7 @@ export const CATALOG = [
     type:     'line',
     api:      'dominance',
     unit:     '%',
-    source:   'CoinGecko',
+    source:   'Coin Metrics / CoinGecko',
   },
 
   // ── MINING ─────────────────────────────────────────────────────
@@ -111,12 +111,12 @@ export const CATALOG = [
   {
     id:       'lth-supply',
     title:    'Long-Term Holder Supply',
-    subtitle: 'BTC held >155 days',
+    subtitle: 'BTC inactive for 1+ year',
     category: 'on-chain',
     type:     'area',
     api:      'lth',
     unit:     'M BTC',
-    source:   'Glassnode',
+    source:   'Coin Metrics',
   },
   {
     id:       'exchange-balance',
@@ -131,12 +131,12 @@ export const CATALOG = [
   {
     id:       'nvt',
     title:    'NVT Ratio',
-    subtitle: 'Network Value to Transactions',
+    subtitle: 'Market cap ÷ on-chain transfer volume',
     category: 'on-chain',
     type:     'line',
     api:      'nvt',
     unit:     '',
-    source:   'Glassnode',
+    source:   'Coin Metrics',
   },
 
   // ── MEMPOOL ────────────────────────────────────────────────────

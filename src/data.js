@@ -38,6 +38,7 @@ const BLOCKS_PER_DAY    = 144;
 
 // ─── In-memory cache (keyed by api id) ───────────────────────────
 const cache = {};
+const _cmCache = {}; // Coin Metrics metric-level cache (avoids duplicate requests)
 
 // ─── Mock generator (seeded, deterministic) ──────────────────────
 function mockSeries(seed, length, base, amp, trend) {
@@ -138,7 +139,9 @@ async function fetchBlockWeight() {
 }
 
 // Coin Metrics: one metric per call, browser-fetchable directly (no proxy).
+// Results are cached at the metric level so parallel fetchers don't duplicate requests.
 async function fetchCoinMetric(metric) {
+  if (_cmCache[metric]) return _cmCache[metric];
   const end   = new Date();
   const start = new Date(end - 370 * 86_400_000);
   const url = `${COINMETRICS_BASE}?assets=btc&metrics=${metric}&frequency=1d`
@@ -147,7 +150,9 @@ async function fetchCoinMetric(metric) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`${metric} HTTP ${r.status}`);
   const j = await r.json();
-  return j.data.map(d => ({ ts: new Date(d.time).getTime(), v: parseFloat(d[metric]) }));
+  const data = j.data.map(d => ({ ts: new Date(d.time).getTime(), v: parseFloat(d[metric]) }));
+  _cmCache[metric] = data;
+  return data;
 }
 
 async function fetchAddresses() {
@@ -180,6 +185,75 @@ async function fetchHashPrice() {
       if (hashrate == null || usd == null) return null;
       const dailyRevenueUsd = BLOCKS_PER_DAY * (BLOCK_SUBSIDY_BTC + avgFeeBtc) * usd;
       return { ts, v: dailyRevenueUsd / (hashrate * 1e6) }; // EH/s → TH/s
+    })
+    .filter(Boolean);
+}
+
+// Price + market cap from Coin Metrics (free, no key, open CORS — more reliable than
+// CoinGecko's public endpoint which rate-limits anonymous requests).
+async function fetchPrice() {
+  return fetchCoinMetric('PriceUSD');
+}
+
+async function fetchMarketCap() {
+  return (await fetchCoinMetric('CapMrktCurUSD')).map(d => ({ ts: d.ts, v: d.v / 1e12 }));
+}
+
+// 24h trading volume: no free on-chain proxy for exchange volume → keep CoinGecko.
+async function fetchVolume() {
+  const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
+  const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily${key}`);
+  if (!r.ok) throw new Error(`CoinGecko volume HTTP ${r.status}`);
+  const j = await r.json();
+  return j.total_volumes.map(([ts, v]) => ({ ts, v: v / 1e9 }));
+}
+
+// BTC dominance: Coin Metrics BTC market cap ÷ CoinGecko total crypto market cap.
+async function fetchDominance() {
+  const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
+  const [btcCap, globalR] = await Promise.all([
+    fetchCoinMetric('CapMrktCurUSD'),
+    fetch(`https://api.coingecko.com/api/v3/global/market_cap_chart?days=365${key}`)
+      .then(r => { if (!r.ok) throw new Error(`CoinGecko global HTTP ${r.status}`); return r.json(); }),
+  ]);
+  const totalByDay = new Map(
+    globalR.market_cap_chart.market_cap.map(([ts, v]) => [Math.floor(ts / 86_400_000), v])
+  );
+  return btcCap
+    .map(({ ts, v }) => {
+      const total = totalByDay.get(Math.floor(ts / 86_400_000));
+      return total ? { ts, v: (v / total) * 100 } : null;
+    })
+    .filter(Boolean);
+}
+
+// NVT ratio: market cap ÷ adjusted on-chain transfer volume — both free on Coin Metrics.
+async function fetchNvt() {
+  const [cap, vol] = await Promise.all([
+    fetchCoinMetric('CapMrktCurUSD'),
+    fetchCoinMetric('TxTfrValAdjUSD'),
+  ]);
+  const volByDay = new Map(vol.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
+  return cap
+    .map(({ ts, v: capVal }) => {
+      const txVol = volByDay.get(Math.floor(ts / 86_400_000));
+      return (txVol && txVol > 0) ? { ts, v: capVal / txVol } : null;
+    })
+    .filter(Boolean);
+}
+
+// Long-Term Holder Supply proxy: coins not transacted in 1+ year (SplyCur − SplyAct1yr).
+// Free on Coin Metrics Community API — no Glassnode key required.
+async function fetchLth() {
+  const [total, active1yr] = await Promise.all([
+    fetchCoinMetric('SplyCur'),
+    fetchCoinMetric('SplyAct1yr'),
+  ]);
+  const actByDay = new Map(active1yr.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
+  return total
+    .map(({ ts, v }) => {
+      const act = actByDay.get(Math.floor(ts / 86_400_000));
+      return act != null ? { ts, v: (v - act) / 1e6 } : null; // → M BTC
     })
     .filter(Boolean);
 }
@@ -256,21 +330,6 @@ export function fmtTimeAgo(unixSeconds) {
   return `${Math.round(diffMin / 60)}h ago`;
 }
 
-// CoinGecko: fetch market chart once, split into price / marketcap / volume
-async function fetchMarketChart() {
-  if (cache._market) return cache._market;
-  const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
-  const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily${key}`);
-  if (!r.ok) throw new Error(`CoinGecko HTTP ${r.status}`);
-  const j = await r.json();
-  cache._market = {
-    price:     j.prices.map(([ts, v]) => ({ ts, v })),
-    marketcap: j.market_caps.map(([ts, v]) => ({ ts, v: v / 1e12 })), // → trillions
-    volume:    j.total_volumes.map(([ts, v]) => ({ ts, v: v / 1e9 })), // → billions
-  };
-  return cache._market;
-}
-
 // Map api id → async fetcher function
 const FETCHERS = {
   hashrate:    fetchHashrate,
@@ -283,11 +342,12 @@ const FETCHERS = {
   tps:         fetchTps,
   exchange:    fetchExchangeBalance,
   hashprice:   fetchHashPrice,
-  price:       async () => (await fetchMarketChart()).price,
-  marketcap:   async () => (await fetchMarketChart()).marketcap,
-  volume:      async () => (await fetchMarketChart()).volume,
-  // Remaining mock: dominance (no free historical source found),
-  // lth + nvt (Glassnode-proprietary, needs a paid key)
+  price:       fetchPrice,
+  marketcap:   fetchMarketCap,
+  volume:      fetchVolume,
+  dominance:   fetchDominance,
+  nvt:         fetchNvt,
+  lth:         fetchLth,
 };
 
 // ─── Public API ───────────────────────────────────────────────────
