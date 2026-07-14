@@ -92,14 +92,14 @@ function dailyAvg(points) {
 }
 
 async function fetchHashrate() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/hashrate/1y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/hashrate/3y`);
   if (!r.ok) throw new Error(`hashrate HTTP ${r.status}`);
   const j = await r.json();
   return j.hashrates.map(d => ({ ts: d.timestamp * 1000, v: d.avgHashrate / 1e18 }));
 }
 
 async function fetchDifficulty() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/difficulty-adjustments/1y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/difficulty-adjustments/3y`);
   if (!r.ok) throw new Error(`difficulty HTTP ${r.status}`);
   const j = await r.json(); // [[ts_s, height, difficulty, adjustment], ...] newest first
   return j
@@ -108,21 +108,21 @@ async function fetchDifficulty() {
 }
 
 async function fetchBlockFees() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fees/1y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fees/3y`);
   if (!r.ok) throw new Error(`fees HTTP ${r.status}`);
   const j = await r.json(); // [{ timestamp, avgFees (sats) }, ...]
   return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFees / 1e8 })));
 }
 
 async function fetchFeeRates() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fee-rates/1y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fee-rates/3y`);
   if (!r.ok) throw new Error(`feerates HTTP ${r.status}`);
   const j = await r.json(); // [{ timestamp, avgFee_50 (sat/vB) }, ...]
   return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFee_50 })));
 }
 
 async function fetchMempool() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/statistics/1y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/statistics/3y`);
   if (!r.ok) throw new Error(`mempool HTTP ${r.status}`);
   const j = await r.json(); // [{ added (ts_s), vsizes: [vB per fee bucket] }, ...] newest first
   return dailyAvg(j.map(d => ({
@@ -132,7 +132,7 @@ async function fetchMempool() {
 }
 
 async function fetchBlockWeight() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/sizes-weights/1y`);
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/sizes-weights/3y`);
   if (!r.ok) throw new Error(`blockweight HTTP ${r.status}`);
   const j = await r.json(); // { weights: [{ timestamp, avgWeight (WU) }, ...] }
   return dailyAvg(j.weights.map(d => ({ ts: d.timestamp * 1000, v: d.avgWeight / 1e6 })));
@@ -143,7 +143,7 @@ async function fetchBlockWeight() {
 async function fetchCoinMetric(metric) {
   if (_cmCache[metric]) return _cmCache[metric];
   const end   = new Date();
-  const start = new Date(end - 370 * 86_400_000);
+  const start = new Date(end - 1825 * 86_400_000); // 5 years
   const url = `${COINMETRICS_BASE}?assets=btc&metrics=${metric}&frequency=1d`
     + `&start_time=${start.toISOString().slice(0, 10)}&end_time=${end.toISOString().slice(0, 10)}`
     + `&page_size=10000`;

@@ -85,6 +85,19 @@ export function drawFullChart(container, data, cfg, period) {
   svg.appendChild(svgEl('rect', { width: W, height: H, fill: 'transparent' }));
 
   // ── Grid ───────────────────────────────────────────────────────
+  const _step = range / GRID_N;
+  const _fmtGrid = v => {
+    const a = Math.abs(v);
+    if (a >= 1e9)  return `${(v / 1e9).toFixed(range / 1e9 < 5 ? 1 : 0)}B`;
+    if (a >= 1e6)  return `${(v / 1e6).toFixed(range / 1e6 < 5 ? 1 : 0)}M`;
+    if (a >= 1e3)  return `${(v / 1e3).toFixed(range / 1e3 < 5 ? 1 : 0)}k`;
+    if (_step >= 10)   return v.toFixed(0);
+    if (_step >= 1)    return v.toFixed(1);
+    if (_step >= 0.1)  return v.toFixed(2);
+    if (_step >= 0.01) return v.toFixed(3);
+    return v.toFixed(4);
+  };
+
   for (let i = 0; i <= GRID_N; i++) {
     const y   = PAD.top + (i / GRID_N) * CH;
     const val = max - (i / GRID_N) * range;
@@ -102,9 +115,7 @@ export function drawFullChart(container, data, cfg, period) {
       fill: 'rgba(128,128,128,0.65)',
       'font-style': 'italic',
     });
-    lbl.textContent = val > 1e9 ? `${(val / 1e9).toFixed(0)}B`
-                    : val > 1e6 ? `${(val / 1e6).toFixed(0)}M`
-                    : val.toFixed(1);
+    lbl.textContent = _fmtGrid(val);
     svg.appendChild(lbl);
   }
 
@@ -114,18 +125,20 @@ export function drawFullChart(container, data, cfg, period) {
     stroke: 'rgba(128,128,128,0.28)', 'stroke-width': '1', 'stroke-linecap': 'round',
   }));
 
-  // X-axis labels
+  // X-axis labels — show year when data spans > ~13 months
+  const _span = sliced.length > 1 ? sliced[sliced.length - 1].ts - sliced[0].ts : 0;
+  const _showYear = _span > 400 * 86_400_000;
   [0, 0.25, 0.5, 0.75, 1].forEach(t => {
     const idx = Math.round(t * (sliced.length - 1));
     const x   = PAD.left + t * CW;
-    const mo  = new Date(sliced[idx]?.ts || Date.now()).getMonth();
+    const d   = new Date(sliced[idx]?.ts || Date.now());
     const lbl = svgEl('text', {
       x, y: PAD.top + CH + 18,
       'text-anchor': 'middle',
       'font-family': T.body, 'font-size': '12',
       fill: 'rgba(128,128,128,0.6)', 'font-style': 'italic',
     });
-    lbl.textContent = MONTHS[mo];
+    lbl.textContent = _showYear ? d.getFullYear() : MONTHS[d.getMonth()];
     svg.appendChild(lbl);
   });
 
