@@ -197,6 +197,33 @@ export function injectGalleryStyles() {
 
     .ocm-see-more { cursor: pointer; }
 
+    @keyframes ocm-pending-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+    .ocm-block-cube--pending {
+      animation: ocm-pending-pulse 1.5s ease-in-out infinite;
+    }
+    .ocm-blockstrip > .ocm-block-cube--pending:nth-child(1) { animation-delay:  0s;     }
+    .ocm-blockstrip > .ocm-block-cube--pending:nth-child(2) { animation-delay: -0.25s;  }
+    .ocm-blockstrip > .ocm-block-cube--pending:nth-child(3) { animation-delay: -0.5s;   }
+
+    .ocm-block-explorer {
+      text-decoration: none;
+      opacity: 0.45;
+      transition: opacity 0.2s;
+    }
+    .ocm-block-explorer:hover { opacity: 1; }
+    .ocm-block-explorer-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      height: 100%;
+      padding: 0 14px;
+      box-sizing: border-box;
+    }
+
     @media (max-width: 700px) {
       .ocm-gallery-view { flex-direction: column; gap: 16px; }
       .ocm-sidebar {

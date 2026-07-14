@@ -37,7 +37,7 @@ export function initBlockStrip() {
       loadRecentBlocks(),
     ]);
     lastPending   = pending.slice(0, 3).map((b, i) => ({ ...b, _index: i }));
-    lastConfirmed = confirmed.slice(0, 8);
+    lastConfirmed = confirmed.slice(0, 15);
     _render(strip);
   };
 
@@ -70,6 +70,8 @@ function _render(strip) {
       meta: `${b.height.toLocaleString('en-US')} · ${fmtTimeAgo(b.timestamp)} · ${b.extras.pool.name}`,
     }));
   });
+
+  strip.appendChild(_explorerLink());
 }
 
 function _pickaxeIcon() {
@@ -82,6 +84,45 @@ function _pickaxeIcon() {
   svg.appendChild(svgEl('path', { d: 'M 667.679688 641.664062 L 289.960938 263.953125 L 263.707031 290.210938 L 641.425781 667.921875 C 648.433594 674.9375 660.664062 674.9375 667.683594 667.921875 C 674.917969 660.683594 674.917969 648.902344 667.679688 641.664062 Z' }));
   svg.appendChild(svgEl('path', { d: 'M 209.78125 150.789062 C 192.59375 156.628906 180.5 166.261719 173.257812 173.503906 C 160.660156 186.101562 154.011719 199.859375 150.546875 210.027344 L 165.585938 223.949219 L 243.804688 296.335938 L 253.375 286.761719 L 296.09375 244.039062 Z' }));
   return svg;
+}
+
+function _explorerLink() {
+  const wrap = document.createElement('a');
+  wrap.className = 'ocm-block-cube ocm-block-explorer';
+  wrap.href = 'https://mempool.space';
+  wrap.target = '_blank';
+  wrap.rel = 'noopener noreferrer';
+
+  const svg = svgEl('svg', {
+    class: 'ocm-block-cube-bg',
+    viewBox: '0 0 100 100',
+    preserveAspectRatio: 'none',
+  });
+  const s = T.textAdaptive;
+  svg.appendChild(svgEl('polygon', {
+    points: `0,${DEPTH} ${DEPTH},0 100,0 ${100 - DEPTH},${DEPTH}`,
+    style: `fill:none; stroke:${s}; stroke-width:0.7; opacity:0.5;`,
+  }));
+  svg.appendChild(svgEl('polygon', {
+    points: `${100 - DEPTH},${DEPTH} 100,0 100,${100 - DEPTH} ${100 - DEPTH},100`,
+    style: `fill:none; stroke:${s}; stroke-width:0.7; opacity:0.5;`,
+  }));
+  svg.appendChild(svgEl('polygon', {
+    points: `0,${DEPTH} ${100 - DEPTH},${DEPTH} ${100 - DEPTH},100 0,100`,
+    style: `fill:none; stroke:${s}; stroke-width:0.7; stroke-dasharray:3,3; opacity:0.5;`,
+  }));
+  wrap.appendChild(svg);
+
+  const content = document.createElement('div');
+  content.className = 'ocm-block-explorer-content';
+  content.innerHTML = `
+    <p style="font-family:${T.heading};font-size:13px;font-weight:600;color:${T.textAdaptive};margin:0 0 4px;opacity:0.5;">Explorer</p>
+    <p style="font-family:${T.heading};font-size:15px;font-weight:600;color:${T.textAdaptive};margin:0;">mempool</p>
+    <p style="font-family:${T.heading};font-size:15px;font-weight:600;color:${T.accent};margin:0;">.space →</p>
+  `;
+  wrap.appendChild(content);
+
+  return wrap;
 }
 
 function _cube(kind, d) {
