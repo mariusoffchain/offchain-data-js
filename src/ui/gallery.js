@@ -9,8 +9,8 @@ import { drawFullChart } from '../charts/fullchart.js';
 import { initSidebar } from './sidebar.js';
 import { injectGalleryStyles } from './styles.js';
 
-const CARD_PERIODS  = ['3M', '1Y', 'ALL'];
-const DEFAULT_PERIOD = '3M';
+const CARD_PERIODS  = ['1W', '1M', '3M', '1Y', 'ALL'];
+const DEFAULT_PERIOD = '1M';
 
 /**
  * initGallery(onCardClick)

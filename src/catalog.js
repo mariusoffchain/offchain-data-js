@@ -139,6 +139,38 @@ export const CATALOG = [
     source:   'Coin Metrics',
   },
 
+  // ── LIGHTNING ──────────────────────────────────────────────────
+  {
+    id:       'lightning-nodes',
+    title:    'Lightning Nodes',
+    subtitle: 'Number of public Lightning Network nodes',
+    category: 'lightning',
+    type:     'area',
+    api:      'lnnodes',
+    unit:     'K',
+    source:   'mempool.space',
+  },
+  {
+    id:       'lightning-channels',
+    title:    'Lightning Channels',
+    subtitle: 'Total open payment channels',
+    category: 'lightning',
+    type:     'area',
+    api:      'lnchannels',
+    unit:     'K',
+    source:   'mempool.space',
+  },
+  {
+    id:       'lightning-capacity',
+    title:    'Lightning Capacity',
+    subtitle: 'Total BTC locked in the Lightning Network',
+    category: 'lightning',
+    type:     'line',
+    api:      'lncapacity',
+    unit:     'BTC',
+    source:   'mempool.space',
+  },
+
   // ── MEMPOOL ────────────────────────────────────────────────────
   {
     id:       'mempool-size',
@@ -182,4 +214,4 @@ export const CATALOG = [
   },
 ];
 
-export const CATEGORIES = ['market', 'mining', 'on-chain', 'mempool'];
+export const CATEGORIES = ['market', 'mining', 'on-chain', 'lightning', 'mempool'];

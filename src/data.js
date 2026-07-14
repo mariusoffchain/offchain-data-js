@@ -67,6 +67,9 @@ const MOCK = {
   lth:        () => mockSeries(13, 365, 500,      30,      0.5),
   exchange:   () => mockSeries(15, 365, 2.8,      0.04,   -0.001),
   nvt:        () => mockSeries(16, 365, 600_000,  50_000,  100),
+  lnnodes:    () => mockSeries(21, 365, 16_000,   500,     10),
+  lnchannels: () => mockSeries(22, 365, 65_000,   2_000,   50),
+  lncapacity: () => mockSeries(23, 365, 5_300,    50,      1),
   mempool:    () => mockSeries(17, 90,  35,       18,      0.05),
   feerates:   () => mockSeries(18, 90,  15,       10,      0.02),
   tps:        () => mockSeries(19, 90,  5.5,      1,       0.002),
@@ -136,6 +139,31 @@ async function fetchBlockWeight() {
   if (!r.ok) throw new Error(`blockweight HTTP ${r.status}`);
   const j = await r.json(); // { weights: [{ timestamp, avgWeight (WU) }, ...] }
   return dailyAvg(j.weights.map(d => ({ ts: d.timestamp * 1000, v: d.avgWeight / 1e6 })));
+}
+
+// Lightning Network stats — all three charts share one API call (cache avoids duplicates).
+let _lnCache = null;
+async function _fetchLightningStats() {
+  if (_lnCache) return _lnCache;
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/lightning/statistics/3y`);
+  if (!r.ok) throw new Error(`lightning stats HTTP ${r.status}`);
+  _lnCache = await r.json();
+  return _lnCache;
+}
+
+async function fetchLightningNodes() {
+  const j = await _fetchLightningStats();
+  return j.map(d => ({ ts: d.added * 1000, v: d.node_count }));
+}
+
+async function fetchLightningChannels() {
+  const j = await _fetchLightningStats();
+  return j.map(d => ({ ts: d.added * 1000, v: d.channel_count }));
+}
+
+async function fetchLightningCapacity() {
+  const j = await _fetchLightningStats();
+  return j.map(d => ({ ts: d.added * 1000, v: d.total_capacity / 1e8 })); // sats → BTC
 }
 
 // Coin Metrics: one metric per call, browser-fetchable directly (no proxy).
@@ -324,6 +352,9 @@ const FETCHERS = {
   dominance:   fetchCircSupply,
   nvt:         fetchTxCount,
   lth:         fetchMinerRevenue,
+  lnnodes:     fetchLightningNodes,
+  lnchannels:  fetchLightningChannels,
+  lncapacity:  fetchLightningCapacity,
 };
 
 // ─── Public API ───────────────────────────────────────────────────
