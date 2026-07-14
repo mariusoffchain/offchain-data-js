@@ -8,6 +8,7 @@ import { loadData, slicePeriod, fmtVal, fmtValBig } from '../data.js';
 import { drawFullChart } from '../charts/fullchart.js';
 import { initSidebar } from './sidebar.js';
 import { injectGalleryStyles } from './styles.js';
+import { T } from '../tokens.js';
 
 const CARD_PERIODS  = ['1W', '1M', '3M', '1Y', 'ALL'];
 const DEFAULT_PERIOD = '1M';
@@ -95,8 +96,17 @@ async function _mountCard(card) {
 
   const render = period => {
     drawFullChart(chartDiv, data, cfg, period);
-    const sliced    = slicePeriod(data, period);
+    const sliced     = slicePeriod(data, period);
     const lastSliced = sliced[sliced.length - 1];
+
+    if (!chartDiv.firstChild) {
+      // drawFullChart found no data for this period — show a message
+      chartDiv.style.cssText = 'display:flex;align-items:center;justify-content:center';
+      chartDiv.innerHTML = `<span style="font-family:${T.body};font-style:italic;font-size:13px;color:rgba(128,128,128,0.5)">No data for this period</span>`;
+    } else {
+      chartDiv.style.cssText = '';
+    }
+
     const readingEl = card.querySelector('.ocm-card-reading');
     if (readingEl && lastSliced) {
       readingEl.textContent = fmtVal(lastSliced.v, cfg.unit) + (live ? '' : ' (demo)');

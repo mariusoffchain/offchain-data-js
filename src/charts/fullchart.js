@@ -150,7 +150,7 @@ export function drawFullChart(container, data, cfg, period) {
 
   // ── Chart body ─────────────────────────────────────────────────
   if (cfg.type === 'bar') {
-    _drawBars(svg, defs, sliced, min, range);
+    _drawBars(svg, defs, sliced, min, range, cfg);
   } else {
     _drawLineCurve(svg, points, data, cfg, sliced);
   }
@@ -194,20 +194,24 @@ export function drawFullChart(container, data, cfg, period) {
 }
 
 // ── Private: bar chart ─────────────────────────────────────────────
-function _drawBars(svg, defs, sliced, min, range) {
-  const gap = 3;
-  const bw  = (CW - gap * (sliced.length - 1)) / Math.max(sliced.length, 1);
-  const g   = svgEl('g', { filter: 'url(#ocm-rough)' });
+function _drawBars(svg, defs, sliced, min, range, cfg) {
+  const gap  = 3;
+  const bw   = (CW - gap * (sliced.length - 1)) / Math.max(sliced.length, 1);
+  const bars = [];
+  const g    = svgEl('g', { filter: 'url(#ocm-rough)' });
 
   sliced.forEach((d, i) => {
-    const h      = ((d.v - min) / range) * CH;
+    const rawH   = ((d.v - min) / range) * CH;
+    const h      = Math.max(rawH, 2);           // min 2px so bars are always visible
     const x      = PAD.left + i * (bw + gap);
     const y      = PAD.top + CH - h;
     const isLast = i === sliced.length - 1;
 
+    bars.push({ x, y, w: bw, h, d, cx: x + bw / 2 });
+
     const barColor = isLast ? T.accent : T.line;
-    const gradId = `ocm-bv-${i}`;
-    const grad   = svgEl('linearGradient', { id: gradId, x1: '0', y1: '0', x2: '0', y2: '1' });
+    const gradId   = `ocm-bv-${i}`;
+    const grad     = svgEl('linearGradient', { id: gradId, x1: '0', y1: '0', x2: '0', y2: '1' });
     grad.appendChild(svgEl('stop', { offset: '0%',   style: `stop-color: ${barColor}`, 'stop-opacity': isLast ? '1' : '0.85' }));
     grad.appendChild(svgEl('stop', { offset: '100%', style: `stop-color: ${barColor}`, 'stop-opacity': isLast ? '0.75' : '0.6' }));
     defs.appendChild(grad);
@@ -219,6 +223,63 @@ function _drawBars(svg, defs, sliced, min, range) {
   });
 
   svg.appendChild(g);
+
+  // ── Hover overlay ───────────────────────────────────────────────
+  const highlight = svgEl('rect', {
+    x: 0, y: 0, width: 0, height: 0, rx: '1.5',
+    fill: 'rgba(255,255,255,0.20)', 'pointer-events': 'none', opacity: '0',
+  });
+  svg.appendChild(highlight);
+
+  const tooltipG = svgEl('g', { opacity: '0', 'pointer-events': 'none' });
+  const ttBox    = svgEl('rect', { x: 0, y: 0, width: 130, height: 42, rx: '2', fill: T.ink });
+  const ttDate   = svgEl('text', { x: 10, y: 14, 'font-family': T.body, 'font-size': '10', fill: 'rgba(255,255,255,0.55)', 'font-style': 'italic' });
+  const ttVal    = svgEl('text', { x: 10, y: 32, 'font-family': T.heading, 'font-size': '14', 'font-weight': '600', fill: '#fff' });
+  tooltipG.appendChild(ttBox);
+  tooltipG.appendChild(ttDate);
+  tooltipG.appendChild(ttVal);
+  svg.appendChild(tooltipG);
+
+  const hitArea = svgEl('rect', {
+    x: PAD.left, y: PAD.top, width: CW, height: CH,
+    fill: 'transparent', style: 'cursor:crosshair',
+  });
+
+  hitArea.addEventListener('mousemove', e => {
+    const rect  = svg.getBoundingClientRect();
+    const scaleX = W / rect.width;
+    const mx    = (e.clientX - rect.left) * scaleX;
+
+    let nearest = bars[0];
+    let minDist = Infinity;
+    bars.forEach(b => {
+      const dist = Math.abs(b.cx - mx);
+      if (dist < minDist) { minDist = dist; nearest = b; }
+    });
+    if (!nearest) return;
+
+    highlight.setAttribute('x', nearest.x);
+    highlight.setAttribute('y', nearest.y);
+    highlight.setAttribute('width', nearest.w);
+    highlight.setAttribute('height', nearest.h);
+    highlight.setAttribute('opacity', '1');
+
+    const tx = Math.min(nearest.cx - 65, W - 140);
+    const ty = Math.max(nearest.y - 52, PAD.top);
+    ttBox.setAttribute('x', tx);  ttBox.setAttribute('y', ty);
+    ttDate.setAttribute('x', tx + 10); ttDate.setAttribute('y', ty + 14);
+    ttVal.setAttribute('x',  tx + 10); ttVal.setAttribute('y',  ty + 32);
+    ttDate.textContent = fmtDate(nearest.d.ts);
+    ttVal.textContent  = fmtValTooltip(nearest.d.v, cfg.unit);
+    tooltipG.setAttribute('opacity', '1');
+  });
+
+  hitArea.addEventListener('mouseleave', () => {
+    highlight.setAttribute('opacity', '0');
+    tooltipG.setAttribute('opacity', '0');
+  });
+
+  svg.appendChild(hitArea);
 }
 
 // ── Private: line/area chart with hover tooltip ────────────────────

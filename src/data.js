@@ -13,7 +13,7 @@
  *   3. Done — mock fallback kicks in automatically on failure
  */
 
-import { PERIOD_N } from './tokens.js';
+// PERIOD_N removed — slicePeriod now filters by timestamp, not count
 
 // ─── API configuration ────────────────────────────────────────────
 // mempool.space blocks browser CORS, so all its endpoints go through
@@ -57,7 +57,7 @@ function mockSeries(seed, length, base, amp, trend) {
 const MOCK = {
   price:      () => mockSeries(5,  365, 85_000,   4_000,   120),
   marketcap:  () => mockSeries(7,  365, 1.6e12,   8e10,    3e9),
-  volume:     () => mockSeries(13, 365, 35e9,     8e9,     1e8),
+  volume:     () => mockSeries(13, 365, 35,        8,       0.1),   // in $B, matches fetchVolume
   dominance:  () => mockSeries(6,  365, 19.8,     0.05,    0.001),
   hashrate:   () => mockSeries(3,  365, 600,      25,      0.6),
   difficulty: () => mockSeries(9,  52,  80,       5,       0.15),
@@ -220,7 +220,29 @@ async function fetchHashPrice() {
 // Price + market cap from Coin Metrics (free, no key, open CORS — more reliable than
 // CoinGecko's public endpoint which rate-limits anonymous requests).
 async function fetchPrice() {
-  return fetchCoinMetric('PriceUSD');
+  const daily = await fetchCoinMetric('PriceUSD');
+
+  // Supplement with CoinGecko hourly data for the last 30 days.
+  // CoinGecko auto-selects hourly when days ≤ 90 and no interval= is set.
+  try {
+    const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
+    const r = await fetch(
+      `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=30${key}`
+    );
+    if (r.ok) {
+      const j = await r.json();
+      const hourly = (j.prices || [])
+        .filter(([, v]) => v != null)
+        .map(([ts, v]) => ({ ts, v }));
+      if (hourly.length > 24) {
+        // Replace last 30 days of daily with hourly for finer resolution
+        const cutoff = hourly[0].ts;
+        return [...daily.filter(d => d.ts < cutoff), ...hourly];
+      }
+    }
+  } catch { /* hourly supplement is optional */ }
+
+  return daily;
 }
 
 async function fetchMarketCap() {
@@ -228,12 +250,16 @@ async function fetchMarketCap() {
 }
 
 // 24h trading volume: no free on-chain proxy for exchange volume → keep CoinGecko.
+// No interval=daily: CoinGecko auto-selects daily for 365 days.
 async function fetchVolume() {
   const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
-  const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily${key}`);
+  const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365${key}`);
   if (!r.ok) throw new Error(`CoinGecko volume HTTP ${r.status}`);
   const j = await r.json();
-  return j.total_volumes.map(([ts, v]) => ({ ts, v: v / 1e9 }));
+  if (!j.total_volumes?.length) throw new Error('CoinGecko volume: empty response');
+  return j.total_volumes
+    .filter(([, v]) => v != null && v > 0)
+    .map(([ts, v]) => ({ ts, v: v / 1e9 }));
 }
 
 // Circulating Supply — SplyCur / 1e6 → M BTC.
@@ -386,11 +412,15 @@ export async function loadData(apiKey) {
 
 /**
  * slicePeriod(data, period)
- * Trims data array to the last N points for the requested period.
+ * Filters data to the time window matching the period.
+ * Works with both daily and sub-daily (hourly) data.
  */
 export function slicePeriod(data, period) {
-  const n = PERIOD_N[period] ?? data.length;
-  return data.slice(-Math.min(n, data.length));
+  if (!data.length || period === 'ALL') return data;
+  const days = { '1D': 1, '1W': 7, '1M': 30, '3M': 90, '1Y': 365 }[period];
+  if (!days) return data;
+  const cutoff = Date.now() - days * 86_400_000;
+  return data.filter(d => d.ts >= cutoff);
 }
 
 /**
