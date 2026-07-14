@@ -18,6 +18,7 @@ const CH  = H - PAD.top  - PAD.bottom;
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const GRID_N = 5;
+let _wmId = 0;
 
 /**
  * drawFullChart(container, data, cfg, period)
@@ -136,14 +137,7 @@ export function drawFullChart(container, data, cfg, period) {
   }
 
   // ── Branding ───────────────────────────────────────────────────
-  const wm = svgEl('text', {
-    x: W / 2, y: PAD.top + CH / 2 + 8,
-    'text-anchor': 'middle',
-    'font-family': T.heading, 'font-size': '18', 'font-weight': '600',
-    fill: T.ink, opacity: '0.04', 'letter-spacing': '0.18em',
-  });
-  wm.textContent = 'OFF-CHAIN MEDIA';
-  svg.appendChild(wm);
+  _addLogoWatermark(svg, defs);
 
   // Footer
   svg.appendChild(svgEl('line', {
@@ -288,4 +282,59 @@ function _drawLineCurve(svg, points, data, cfg, sliced) {
   });
 
   svg.appendChild(hitArea);
+}
+
+// ── Private: Off-Chain Media logo watermark ────────────────────────
+function _addLogoWatermark(svg, defs) {
+  const p  = `ocmwm${_wmId++}`;
+  const cx = PAD.left + CW / 2;    // horizontal center of chart area
+  const cy = PAD.top  + CH / 2;    // vertical center of chart area
+
+  // Logo symbol spans x=[384,1340], y=[201,629] in original 1440×810 space.
+  // Scale to 160px wide, center on chart.
+  const s  = 160 / 956;
+  const tx = cx - s * 862;
+  const ty = cy - s * 415;
+
+  const addClip = (id, d) => {
+    const cp = svgEl('clipPath', { id: p + id });
+    cp.appendChild(svgEl('path', { d }));
+    defs.appendChild(cp);
+  };
+
+  // Bounding-box clips that create the C-shapes from each full ring path
+  addClip('r', 'M726 201 L1077 201 L1077 629 L726 629Z');
+  addClip('l', 'M384 201 L999 201 L999 629 L384 629Z');
+  // Square clip for the filled block detail
+  addClip('b', 'M934.7 537.1 L1015.5 537.1 L1015.5 628.2 L934.7 628.2Z');
+
+  const wm = svgEl('g', {
+    transform: `translate(${tx.toFixed(1)},${ty.toFixed(1)}) scale(${s.toFixed(4)})`,
+    style: `fill: ${T.line}`,
+    opacity: '0.06',
+  });
+
+  // Right chain ring (clipped to left half → creates right C-shape)
+  const gr = svgEl('g', { 'clip-path': `url(#${p}r)` });
+  gr.appendChild(svgEl('path', { d: 'M1340.3 414.7C1340.4 296.8 1244.8 201.2 1126.9 201.3L958.4 201.4C965.7 207.3 972.8 213.7 979.6 220.5C1000.9 241.8 1018.2 265.9 1031.3 292.1L1126.8 292C1159.6 292 1190.4 304.8 1213.6 328C1236.8 351.1 1249.6 382 1249.5 414.8C1249.5 447.6 1236.7 478.4 1213.5 501.6C1190.3 524.8 1159.4 537.6 1126.7 537.6L939.8 537.7C907 537.8 876.2 525 852.9 501.8C829.8 478.6 817 447.8 817.1 415C817 399.1 820.1 383.6 825.9 369.2C814.7 359.1 800.3 353.6 785.1 353.6L735.3 353.7C729.5 373.1 726.3 393.8 726.2 415.1C726.2 533 821.8 628.6 939.7 628.5L1126.6 628.4C1244.5 628.3 1340.2 532.7 1340.3 414.7Z' }));
+  wm.appendChild(gr);
+
+  // Left chain ring (clipped to right half → creates left C-shape)
+  const gl = svgEl('g', { 'clip-path': `url(#${p}l)` });
+  gl.appendChild(svgEl('path', { d: 'M746.3 610.5C725 589.2 707.5 564.8 694.2 537.9L598.1 537.9C565.3 538 534.4 525.2 511.3 502.1C488.1 478.9 475.3 448.1 475.4 415.2C475.4 382.4 488.2 351.6 511.4 328.4C534.6 305.2 565.4 292.4 598.3 292.4L785.1 292.2C817.9 292.3 848.7 305 871.9 328.2C895.1 351.4 907.8 382.2 907.8 415C907.8 430.9 904.8 446.4 899 460.8C910.2 471 924.6 476.5 939.9 476.4L989.6 476.4C995.4 456.9 998.6 436.3 998.6 414.9C998.7 297 903.1 201.4 785.2 201.5L598.3 201.6C480.3 201.7 384.6 297.3 384.6 415.3C384.5 533.3 480 628.8 598 628.8L766.2 628.6C759.4 623 752.7 616.9 746.3 610.5Z' }));
+  wm.appendChild(gl);
+
+  // Interlocking connector between the two rings (path pre-computed from the
+  // original SVG's matrix transform on the S-curve stroke element)
+  wm.appendChild(svgEl('path', {
+    d: 'M771.5 430C796.8 542.8 866.9 593.7 982.1 582.7',
+    style: `fill:none;stroke:${T.line};stroke-width:50;stroke-linecap:butt;stroke-miterlimit:4`,
+  }));
+
+  // Filled block detail (bottom-right of the logo symbol)
+  const gb = svgEl('g', { 'clip-path': `url(#${p}b)` });
+  gb.appendChild(svgEl('rect', { x: '934.7', y: '537.1', width: '80.8', height: '91.2' }));
+  wm.appendChild(gb);
+
+  svg.appendChild(wm);
 }
