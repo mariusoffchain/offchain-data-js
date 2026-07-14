@@ -19,7 +19,7 @@ import { PERIOD_N } from './tokens.js';
 // mempool.space blocks browser CORS, so all its endpoints go through
 // the Cloudflare Worker proxy (source + deploy steps in worker/).
 // Until the worker is live these fetchers fail → mock fallback.
-const MEMPOOL_BASE = 'https://ocm-proxy.mariusoffchain.workers.dev';
+const MEMPOOL_BASE = 'https://ocm-proxy.offchainmedia.workers.dev';
 
 // CoinGecko free "demo" key (30 req/min) — create one at
 // https://www.coingecko.com/en/developers/dashboard, paste it here,
