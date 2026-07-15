@@ -53,39 +53,94 @@ function _drawFullRanking(container, data, cfg) {
   const itemH  = (H - PAD.top - PAD.bottom) / Math.max(sorted.length, 1);
   const bh     = Math.max(4, Math.min(20, itemH * 0.6));
 
+  // Shared hover tooltip — appended after all rows so it sits on top
+  const tooltipG = svgEl('g', { opacity: '0', 'pointer-events': 'none' });
+  const ttBox    = svgEl('rect', { width: '220', height: '46', rx: '3', fill: T.ink });
+  const ttName   = svgEl('text', { 'font-family': T.body, 'font-size': '11', fill: 'rgba(255,255,255,0.65)', 'font-style': 'italic' });
+  const ttVal    = svgEl('text', { 'font-family': T.heading, 'font-size': '17', 'font-weight': '700', fill: T.accent });
+  tooltipG.appendChild(ttBox);
+  tooltipG.appendChild(ttName);
+  tooltipG.appendChild(ttVal);
+
   sorted.forEach((d, i) => {
     const barLen  = maxV > 0 ? (d.v / maxV) * barW : 0;
+    const barLen2 = Math.max(barLen, 2);
     const cy      = PAD.top + i * itemH + itemH / 2;
     const isTop   = i === 0;
     const barClr  = isTop ? T.accent : T.line;
     const lblFill = isTop ? T.accent : 'rgba(200,200,200,0.82)';
+    const valFill = isTop ? T.accent : 'rgba(128,128,128,0.65)';
+    const fullName = d.name || '—';
+
+    // Per-row hover background (full width → highlights the entire row)
+    const hoverBg = svgEl('rect', {
+      x: '0', y: String(cy - itemH / 2), width: String(W), height: String(itemH),
+      fill: 'rgba(128,128,128,0.06)', opacity: '0', 'pointer-events': 'none',
+    });
+    svg.appendChild(hoverBg);
 
     // Rank number
-    const rank = svgEl('text', { x: 6, y: cy + 4, 'font-family': T.body, 'font-size': '10', fill: 'rgba(128,128,128,0.4)', 'font-style': 'italic' });
+    const rank = svgEl('text', { x: '6', y: String(cy + 4), 'font-family': T.body, 'font-size': '10', fill: 'rgba(128,128,128,0.4)', 'font-style': 'italic' });
     rank.textContent = `#${i + 1}`;
     svg.appendChild(rank);
 
-    // Label (truncated to 20 chars)
-    const label = (d.name || '—').length > 20 ? (d.name || '—').slice(0, 19) + '…' : (d.name || '—');
-    const lbl = svgEl('text', { x: LPAD - 8, y: cy + 4, 'text-anchor': 'end', 'font-family': T.body, 'font-size': '11', fill: lblFill });
+    // Label (truncated to 20 chars for rest state; tooltip shows full name)
+    const label = fullName.length > 20 ? fullName.slice(0, 19) + '…' : fullName;
+    const lbl = svgEl('text', { x: String(LPAD - 8), y: String(cy + 4), 'text-anchor': 'end', 'font-family': T.body, 'font-size': '11', fill: lblFill });
     lbl.textContent = label;
     svg.appendChild(lbl);
 
     // Background track
-    svg.appendChild(svgEl('rect', { x: LPAD, y: cy - bh / 2, width: barW, height: bh, rx: '2', fill: T.grid, opacity: '0.28' }));
+    svg.appendChild(svgEl('rect', { x: String(LPAD), y: String(cy - bh / 2), width: String(barW), height: String(bh), rx: '2', fill: T.grid, opacity: '0.28' }));
 
     // Bar with drop shadow + shimmer
     const barG = svgEl('g', { filter: 'url(#ocm-drop)' });
-    const barLen2 = Math.max(barLen, 2);
-    barG.appendChild(svgEl('rect', { x: LPAD, y: cy - bh / 2, width: barLen2, height: bh, rx: '2', fill: barClr, opacity: isTop ? '0.9' : '0.7' }));
-    barG.appendChild(svgEl('rect', { x: LPAD, y: cy - bh / 2, width: barLen2, height: Math.min(bh / 2, 9), rx: '2', fill: 'rgba(255,255,255,0.22)' }));
+    const barRect = svgEl('rect', { x: String(LPAD), y: String(cy - bh / 2), width: String(barLen2), height: String(bh), rx: '2', fill: barClr, opacity: isTop ? '0.9' : '0.7' });
+    barG.appendChild(barRect);
+    barG.appendChild(svgEl('rect', { x: String(LPAD), y: String(cy - bh / 2), width: String(barLen2), height: String(Math.min(bh / 2, 9)), rx: '2', fill: 'rgba(255,255,255,0.22)' }));
     svg.appendChild(barG);
 
     // Value label
-    const val = svgEl('text', { x: LPAD + barLen2 + 8, y: cy + 4, 'font-family': T.heading, 'font-size': '11', 'font-weight': '500', fill: isTop ? T.accent : 'rgba(128,128,128,0.65)' });
+    const val = svgEl('text', { x: String(LPAD + barLen2 + 8), y: String(cy + 4), 'font-family': T.heading, 'font-size': '11', 'font-weight': '500', fill: valFill });
     val.textContent = fmtValTooltip(d.v, cfg.unit);
     svg.appendChild(val);
+
+    // Invisible hit area covers the full row
+    const hitArea = svgEl('rect', {
+      x: '0', y: String(cy - itemH / 2), width: String(W), height: String(itemH),
+      fill: 'transparent', style: 'cursor:default',
+    });
+
+    hitArea.addEventListener('mousemove', e => {
+      const svgRect = svg.getBoundingClientRect();
+      const mx = (e.clientX - svgRect.left) * (W / svgRect.width);
+      const my = (e.clientY - svgRect.top)  * (H / svgRect.height);
+
+      hoverBg.setAttribute('opacity', '1');
+      barRect.setAttribute('opacity', '1');
+
+      // Position tooltip near cursor; clamp so it never clips the SVG edge
+      const tx = Math.min(mx + 14, W - 228);
+      const ty = Math.max(my - 54, PAD.top);
+      ttBox.setAttribute('x', String(tx));       ttBox.setAttribute('y', String(ty));
+      ttName.setAttribute('x', String(tx + 10)); ttName.setAttribute('y', String(ty + 16));
+      ttVal.setAttribute('x',  String(tx + 10)); ttVal.setAttribute('y', String(ty + 38));
+      ttName.textContent = fullName;
+      ttVal.textContent  = fmtValTooltip(d.v, cfg.unit);
+      tooltipG.setAttribute('opacity', '1');
+    });
+
+    hitArea.addEventListener('mouseleave', () => {
+      hoverBg.setAttribute('opacity', '0');
+      barRect.setAttribute('opacity', isTop ? '0.9' : '0.7');
+      tooltipG.setAttribute('opacity', '0');
+    });
+
+    svg.appendChild(hitArea);
   });
+
+  // Tooltip sits on top of all bars
+  svg.appendChild(tooltipG);
 
   _addLogoWatermark(svg, defs);
 
