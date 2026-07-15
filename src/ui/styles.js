@@ -197,6 +197,26 @@ export function injectGalleryStyles() {
 
     .ocm-see-more { cursor: pointer; }
 
+    /* Headings inside cards — covers WHTML-inserted cards without the
+       Webflow ocm-card-title class (same values, so existing cards unaffected). */
+    .ocm-card h3 {
+      font-family: ${T.heading};
+      font-size: 17px;
+      font-weight: 500;
+      line-height: 1.2;
+      color: ${T.textAdaptive};
+      margin: 0 0 4px;
+    }
+
+    /* Card meta container — styles the direct text in WHTML-inserted cards
+       where the subtitle lives directly in .ocm-card-meta (not in p.ocm-card-sub).
+       Inherited values are overridden by child elements in existing Webflow cards. */
+    .ocm-card-meta {
+      font-size: 12px;
+      font-weight: 300;
+      color: ${T.muted};
+    }
+
     @keyframes ocm-pending-pulse {
       0%, 100% { opacity: 1; }
       50%       { opacity: 0.2; }
