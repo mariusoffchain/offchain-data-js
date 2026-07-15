@@ -67,13 +67,60 @@ const MOCK = {
   lth:        () => mockSeries(13, 365, 500,      30,      0.5),
   exchange:   () => mockSeries(15, 365, 2.8,      0.04,   -0.001),
   nvt:        () => mockSeries(16, 365, 600_000,  50_000,  100),
-  lnnodes:    () => mockSeries(21, 365, 16_000,   500,     10),
-  lnchannels: () => mockSeries(22, 365, 65_000,   2_000,   50),
-  lncapacity: () => mockSeries(23, 365, 5_300,    50,      1),
-  mempool:    () => mockSeries(17, 90,  35,       18,      0.05),
-  feerates:   () => mockSeries(18, 90,  15,       10,      0.02),
-  tps:        () => mockSeries(19, 90,  5.5,      1,       0.002),
-  blockweight:() => mockSeries(20, 90,  3.7,      0.2,     0.001),
+  lnnodes:      () => mockSeries(21, 365, 16_000,   500,     10),
+  lnchannels:   () => mockSeries(22, 365, 65_000,   2_000,   50),
+  lncapacity:   () => mockSeries(23, 365, 5_300,    50,      1),
+  lnavgchannel: () => mockSeries(25, 365, 0.046,    0.004,  -0.00005),
+  blockrewards: () => mockSeries(24, 1825, 3.25,    0.4,    -0.0002),
+  mempool:      () => mockSeries(17, 90,  35,       18,      0.05),
+  feerates:     () => mockSeries(18, 90,  15,       10,      0.02),
+  tps:          () => mockSeries(19, 90,  5.5,      1,       0.002),
+  blockweight:  () => mockSeries(20, 90,  3.7,      0.2,     0.001),
+  miningpools: () => {
+    const now = Date.now();
+    return [
+      { ts: now,       v: 31.2, name: 'Foundry USA' },
+      { ts: now - 100, v: 19.8, name: 'AntPool' },
+      { ts: now - 200, v: 14.5, name: 'F2Pool' },
+      { ts: now - 300, v:  9.3, name: 'ViaBTC' },
+      { ts: now - 400, v:  8.1, name: 'MARA Pool' },
+      { ts: now - 500, v:  5.4, name: 'Braiins Pool' },
+      { ts: now - 600, v:  4.2, name: 'Luxor' },
+      { ts: now - 700, v:  3.1, name: 'BTC.com' },
+      { ts: now - 800, v:  2.4, name: 'Poolin' },
+      { ts: now - 900, v:  2.0, name: 'Others' },
+    ];
+  },
+  lncountries: () => {
+    const now = Date.now();
+    return [
+      { ts: now,         v: 2450, name: 'United States' },
+      { ts: now -  100,  v: 1100, name: 'Germany' },
+      { ts: now -  200,  v:  680, name: 'France' },
+      { ts: now -  300,  v:  590, name: 'Netherlands' },
+      { ts: now -  400,  v:  510, name: 'United Kingdom' },
+      { ts: now -  500,  v:  380, name: 'Canada' },
+      { ts: now -  600,  v:  340, name: 'Finland' },
+      { ts: now -  700,  v:  290, name: 'Australia' },
+      { ts: now -  800,  v:  260, name: 'Japan' },
+      { ts: now -  900,  v:  230, name: 'Sweden' },
+    ];
+  },
+  lnisp: () => {
+    const now = Date.now();
+    return [
+      { ts: now,         v: 850, name: 'Amazon.com' },
+      { ts: now -  100,  v: 620, name: 'Hetzner Online' },
+      { ts: now -  200,  v: 480, name: 'Contabo' },
+      { ts: now -  300,  v: 310, name: 'DigitalOcean' },
+      { ts: now -  400,  v: 260, name: 'OVH SAS' },
+      { ts: now -  500,  v: 190, name: 'Google Cloud' },
+      { ts: now -  600,  v: 160, name: 'Microsoft Azure' },
+      { ts: now -  700,  v: 130, name: 'Linode / Akamai' },
+      { ts: now -  800,  v: 110, name: 'Vultr' },
+      { ts: now -  900,  v:  90, name: 'Home ISPs' },
+    ];
+  },
 };
 
 // ─── Live fetchers ────────────────────────────────────────────────
@@ -164,6 +211,56 @@ async function fetchLightningChannels() {
 async function fetchLightningCapacity() {
   const j = await _fetchLightningStats();
   return j.map(d => ({ ts: d.added * 1000, v: d.total_capacity / 1e8 })); // sats → BTC
+}
+
+async function fetchLightningAvgChannel() {
+  const j = await _fetchLightningStats();
+  return j
+    .filter(d => d.channel_count > 0)
+    .map(d => ({ ts: d.added * 1000, v: (d.total_capacity / 1e8) / d.channel_count }));
+}
+
+// Block Rewards — average total reward (subsidy + fees) per block.
+async function fetchBlockRewards() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/rewards/all`);
+  if (!r.ok) throw new Error(`blockRewards HTTP ${r.status}`);
+  const j = await r.json(); // [{ timestamp, avgRewards (sats) }, ...]
+  return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgRewards / 1e8 })));
+}
+
+// Ranking snapshots — data has dummy sequential timestamps so slicePeriod('ALL') passes.
+// Period buttons are hidden for ranking charts in gallery.js.
+
+async function fetchMiningPools() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/pools/1y`);
+  if (!r.ok) throw new Error(`miningPools HTTP ${r.status}`);
+  const j = await r.json(); // { pools: [{name, blockCount, ...}], blockCount }
+  const total = j.blockCount || 1;
+  const now = Date.now();
+  return j.pools
+    .slice(0, 15)
+    .map((p, i) => ({ ts: now - i * 100, v: (p.blockCount / total) * 100, name: p.name }));
+}
+
+async function fetchLightningCountries() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/lightning/nodes/countries`);
+  if (!r.ok) throw new Error(`lnCountries HTTP ${r.status}`);
+  const j = await r.json(); // { 'US': { name, count, capacity, share }, ... }
+  const now = Date.now();
+  return Object.entries(j)
+    .sort(([, a], [, b]) => b.count - a.count)
+    .slice(0, 15)
+    .map(([, d], i) => ({ ts: now - i * 100, v: d.count, name: d.name || d.isoCode }));
+}
+
+async function fetchLightningISP() {
+  const r = await fetch(`${MEMPOOL_BASE}/api/v1/lightning/nodes/isp-ranking`);
+  if (!r.ok) throw new Error(`lnISP HTTP ${r.status}`);
+  const j = await r.json(); // [{ isp, count, capacity, share }, ...]
+  const now = Date.now();
+  return j
+    .slice(0, 15)
+    .map((d, i) => ({ ts: now - i * 100, v: d.count, name: d.isp || 'Unknown' }));
 }
 
 // Coin Metrics: one metric per call, browser-fetchable directly (no proxy).
@@ -378,9 +475,14 @@ const FETCHERS = {
   dominance:   fetchCircSupply,
   nvt:         fetchTxCount,
   lth:         fetchMinerRevenue,
-  lnnodes:     fetchLightningNodes,
-  lnchannels:  fetchLightningChannels,
-  lncapacity:  fetchLightningCapacity,
+  lnnodes:      fetchLightningNodes,
+  lnchannels:   fetchLightningChannels,
+  lncapacity:   fetchLightningCapacity,
+  lnavgchannel: fetchLightningAvgChannel,
+  blockrewards: fetchBlockRewards,
+  miningpools:  fetchMiningPools,
+  lncountries:  fetchLightningCountries,
+  lnisp:        fetchLightningISP,
 };
 
 // ─── Public API ───────────────────────────────────────────────────

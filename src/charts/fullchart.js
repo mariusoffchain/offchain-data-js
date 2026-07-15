@@ -26,6 +26,85 @@ const SOURCE_URLS = {
   'CoinGecko':     'https://www.coingecko.com',
 };
 
+// ── Private: horizontal ranking chart (snapshot data with labels) ──
+function _drawFullRanking(container, data, cfg) {
+  const svg  = svgEl('svg', { width: '100%', viewBox: `0 0 ${W} ${H}`, style: 'display:block' });
+  const defs = svgEl('defs');
+
+  const dropF  = svgEl('filter', { id: 'ocm-drop', x: '-20%', y: '-20%', width: '140%', height: '140%' });
+  const fBlur  = svgEl('feGaussianBlur', { in: 'SourceAlpha', stdDeviation: '3', result: 'blur' });
+  const fOff   = svgEl('feOffset', { in: 'blur', dx: '2', dy: '4', result: 'off' });
+  const fFlood = svgEl('feFlood', { style: `flood-color: ${T.shadow}`, result: 'floodColor' });
+  const fComp  = svgEl('feComposite', { in: 'floodColor', in2: 'off', operator: 'in', result: 'sh' });
+  const fMerge = svgEl('feMerge');
+  fMerge.appendChild(svgEl('feMergeNode', { in: 'sh' }));
+  fMerge.appendChild(svgEl('feMergeNode', { in: 'SourceGraphic' }));
+  dropF.appendChild(fBlur); dropF.appendChild(fOff); dropF.appendChild(fFlood);
+  dropF.appendChild(fComp); dropF.appendChild(fMerge);
+  defs.appendChild(dropF);
+  svg.appendChild(defs);
+  svg.appendChild(svgEl('rect', { width: W, height: H, fill: 'transparent' }));
+
+  const LPAD   = 152;
+  const RPAD   = 80;
+  const barW   = W - LPAD - RPAD;
+  const sorted = [...data].sort((a, b) => b.v - a.v).slice(0, 15);
+  const maxV   = Math.max(...sorted.map(d => d.v));
+  const itemH  = (H - PAD.top - PAD.bottom) / Math.max(sorted.length, 1);
+  const bh     = Math.max(4, Math.min(20, itemH * 0.6));
+
+  sorted.forEach((d, i) => {
+    const barLen  = maxV > 0 ? (d.v / maxV) * barW : 0;
+    const cy      = PAD.top + i * itemH + itemH / 2;
+    const isTop   = i === 0;
+    const barClr  = isTop ? T.accent : T.line;
+    const lblFill = isTop ? T.accent : 'rgba(200,200,200,0.82)';
+
+    // Rank number
+    const rank = svgEl('text', { x: 6, y: cy + 4, 'font-family': T.body, 'font-size': '10', fill: 'rgba(128,128,128,0.4)', 'font-style': 'italic' });
+    rank.textContent = `#${i + 1}`;
+    svg.appendChild(rank);
+
+    // Label (truncated to 20 chars)
+    const label = (d.name || '—').length > 20 ? (d.name || '—').slice(0, 19) + '…' : (d.name || '—');
+    const lbl = svgEl('text', { x: LPAD - 8, y: cy + 4, 'text-anchor': 'end', 'font-family': T.body, 'font-size': '11', fill: lblFill });
+    lbl.textContent = label;
+    svg.appendChild(lbl);
+
+    // Background track
+    svg.appendChild(svgEl('rect', { x: LPAD, y: cy - bh / 2, width: barW, height: bh, rx: '2', fill: T.grid, opacity: '0.28' }));
+
+    // Bar with drop shadow + shimmer
+    const barG = svgEl('g', { filter: 'url(#ocm-drop)' });
+    const barLen2 = Math.max(barLen, 2);
+    barG.appendChild(svgEl('rect', { x: LPAD, y: cy - bh / 2, width: barLen2, height: bh, rx: '2', fill: barClr, opacity: isTop ? '0.9' : '0.7' }));
+    barG.appendChild(svgEl('rect', { x: LPAD, y: cy - bh / 2, width: barLen2, height: Math.min(bh / 2, 9), rx: '2', fill: 'rgba(255,255,255,0.22)' }));
+    svg.appendChild(barG);
+
+    // Value label
+    const val = svgEl('text', { x: LPAD + barLen2 + 8, y: cy + 4, 'font-family': T.heading, 'font-size': '11', 'font-weight': '500', fill: isTop ? T.accent : 'rgba(128,128,128,0.65)' });
+    val.textContent = fmtValTooltip(d.v, cfg.unit);
+    svg.appendChild(val);
+  });
+
+  _addLogoWatermark(svg, defs);
+
+  // Footer
+  svg.appendChild(svgEl('line', { x1: 0, y1: H - 16, x2: W, y2: H - 16, stroke: T.ink, 'stroke-width': '0.5', opacity: '0.3' }));
+  const srcLink = svgEl('a', { href: SOURCE_URLS[cfg.source] || '#', target: '_blank', style: 'cursor:pointer; text-decoration:none' });
+  const srcTxt  = svgEl('text', { x: PAD.left, y: H - 4, 'font-family': T.body, 'font-size': '11', fill: 'rgba(128,128,128,0.55)', 'font-style': 'italic', style: 'transition:fill 0.15s' });
+  srcTxt.textContent = `Source: ${cfg.source}`;
+  srcLink.addEventListener('mouseenter', () => srcTxt.setAttribute('fill', T.accent));
+  srcLink.addEventListener('mouseleave', () => srcTxt.setAttribute('fill', 'rgba(128,128,128,0.55)'));
+  srcLink.appendChild(srcTxt);
+  svg.appendChild(srcLink);
+  const urlTxt = svgEl('text', { x: W - PAD.right, y: H - 4, 'text-anchor': 'end', 'font-family': T.heading, 'font-size': '10', fill: 'rgba(128,128,128,0.45)', 'letter-spacing': '0.1em' });
+  urlTxt.textContent = 'OFFCHAIN.MEDIA/DATA';
+  svg.appendChild(urlTxt);
+
+  container.appendChild(svg);
+}
+
 /**
  * drawFullChart(container, data, cfg, period)
  * @param {HTMLElement} container
@@ -38,6 +117,11 @@ export function drawFullChart(container, data, cfg, period) {
 
   const sliced = slicePeriod(data, period);
   if (!sliced.length) return;
+
+  if (cfg.type === 'ranking') {
+    _drawFullRanking(container, sliced, cfg);
+    return;
+  }
 
   const { points, min, max, range } = dataToPoints(sliced, PAD, CW, CH);
 

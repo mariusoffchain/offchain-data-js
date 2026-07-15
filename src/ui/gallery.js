@@ -112,9 +112,20 @@ async function _mountCard(card) {
   const titleEl = card.querySelector('h1, h2, h3, h4, h5, h6');
   if (titleEl && cfg.title) titleEl.textContent = cfg.title;
 
-  // Headline always reflects the latest point — period only trims history.
-  const last = data[data.length - 1];
-  if (last) headline.textContent = fmtValBig(last.v, cfg.unit) + (live ? '' : ' (demo)');
+  // Ranking charts: hide period buttons (snapshot data, no time filtering)
+  if (cfg.type === 'ranking') {
+    periodBar.style.display = 'none';
+    currentPeriod = 'ALL';
+  }
+
+  // Headline: for time-series show latest value; for ranking show top-ranked item
+  if (cfg.type === 'ranking') {
+    const top = [...data].sort((a, b) => b.v - a.v)[0];
+    if (top) headline.textContent = top.name || '';
+  } else {
+    const last = data[data.length - 1];
+    if (last) headline.textContent = fmtValBig(last.v, cfg.unit) + (live ? '' : ' (demo)');
+  }
 
   const render = period => {
     drawFullChart(chartDiv, data, cfg, period);
@@ -134,17 +145,20 @@ async function _mountCard(card) {
     }
   };
 
-  // Hide period buttons for periods the data doesn't actually cover
-  const availablePeriods = CARD_PERIODS.filter(p => _hasCoverage(data, p));
-  periodBar.querySelectorAll('.ocm-card-period-btn').forEach(btn => {
-    btn.style.display = availablePeriods.includes(btn.dataset.period) ? '' : 'none';
-  });
+  // Ranking charts skip period logic entirely (period bar is already hidden above)
+  if (cfg.type !== 'ranking') {
+    // Hide period buttons for periods the data doesn't actually cover
+    const availablePeriods = CARD_PERIODS.filter(p => _hasCoverage(data, p));
+    periodBar.querySelectorAll('.ocm-card-period-btn').forEach(btn => {
+      btn.style.display = availablePeriods.includes(btn.dataset.period) ? '' : 'none';
+    });
 
-  // Pick best starting period: 1Y preferred, fall back to 3M, then first available
-  currentPeriod = PERIOD_PREF.find(p => availablePeriods.includes(p)) || availablePeriods[0] || DEFAULT_PERIOD;
-  periodBar.querySelectorAll('.ocm-card-period-btn').forEach(b =>
-    b.classList.toggle('ocm-card-period-active', b.dataset.period === currentPeriod)
-  );
+    // Pick best starting period: 1Y preferred, fall back to 3M, then first available
+    currentPeriod = PERIOD_PREF.find(p => availablePeriods.includes(p)) || availablePeriods[0] || DEFAULT_PERIOD;
+    periodBar.querySelectorAll('.ocm-card-period-btn').forEach(b =>
+      b.classList.toggle('ocm-card-period-active', b.dataset.period === currentPeriod)
+    );
+  }
 
   periodBar.querySelectorAll('.ocm-card-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
