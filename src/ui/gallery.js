@@ -14,6 +14,22 @@ const CARD_PERIODS   = ['1W', '1M', '3M', '1Y', 'ALL'];
 const DEFAULT_PERIOD = '1Y';
 // Preference order when picking the best available period
 const PERIOD_PREF    = ['1Y', '3M', '1M', '1W', 'ALL'];
+// Required min span (days) per period — data must actually *cover* this range
+const PERIOD_DAYS    = { '1W': 7, '1M': 30, '3M': 90, '1Y': 365 };
+
+// A period button is only shown when data genuinely spans that window.
+// Prevents e.g. "1Y" appearing when the source only has 90 days of history.
+function _hasCoverage(data, period) {
+  const sliced = slicePeriod(data, period);
+  if (!sliced.length) return false;
+  if (period === 'ALL') return true;
+  const days = PERIOD_DAYS[period];
+  if (!days) return false;
+  const spanDays = sliced.length > 1
+    ? (sliced[sliced.length - 1].ts - sliced[0].ts) / 86_400_000
+    : 0;
+  return spanDays >= days * 0.7;
+}
 
 /**
  * initGallery(onCardClick)
@@ -118,8 +134,8 @@ async function _mountCard(card) {
     }
   };
 
-  // Hide period buttons for which this chart has no data
-  const availablePeriods = CARD_PERIODS.filter(p => slicePeriod(data, p).length > 0);
+  // Hide period buttons for periods the data doesn't actually cover
+  const availablePeriods = CARD_PERIODS.filter(p => _hasCoverage(data, p));
   periodBar.querySelectorAll('.ocm-card-period-btn').forEach(btn => {
     btn.style.display = availablePeriods.includes(btn.dataset.period) ? '' : 'none';
   });

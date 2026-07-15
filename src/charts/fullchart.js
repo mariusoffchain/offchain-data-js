@@ -193,19 +193,38 @@ export function drawFullChart(container, data, cfg, period) {
   container.appendChild(svg);
 }
 
+// Aggregate dense data into ~60 bars so bar charts stay readable at 1Y/ALL.
+function _binData(data) {
+  if (data.length <= 120) return data;
+  const spanDays = (data[data.length - 1].ts - data[0].ts) / 86_400_000;
+  const binDays  = Math.max(1, Math.ceil(spanDays / 60));
+  const ms       = binDays * 86_400_000;
+  const bins     = new Map();
+  for (const { ts, v } of data) {
+    const k = Math.floor(ts / ms);
+    if (!bins.has(k)) bins.set(k, { ts, sum: 0, n: 0 });
+    const b = bins.get(k);
+    b.sum += v; b.n++;
+  }
+  return [...bins.values()]
+    .sort((a, b) => a.ts - b.ts)
+    .map(b => ({ ts: b.ts, v: b.sum / b.n }));
+}
+
 // ── Private: bar chart ─────────────────────────────────────────────
 function _drawBars(svg, defs, sliced, min, range, cfg) {
-  const gap  = 3;
-  const bw   = (CW - gap * (sliced.length - 1)) / Math.max(sliced.length, 1);
+  const data = _binData(sliced);
+  const gap  = data.length > 80 ? 1 : 3;
+  const bw   = Math.max(1, (CW - gap * (data.length - 1)) / Math.max(data.length, 1));
   const bars = [];
   const g    = svgEl('g', { filter: 'url(#ocm-rough)' });
 
-  sliced.forEach((d, i) => {
+  data.forEach((d, i) => {
     const rawH   = ((d.v - min) / range) * CH;
     const h      = Math.max(rawH, 2);           // min 2px so bars are always visible
     const x      = PAD.left + i * (bw + gap);
     const y      = PAD.top + CH - h;
-    const isLast = i === sliced.length - 1;
+    const isLast = i === data.length - 1;
 
     bars.push({ x, y, w: bw, h, d, cx: x + bw / 2 });
 
