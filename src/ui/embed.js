@@ -36,6 +36,12 @@ function _styleArticlesSection() {
       .find(h => h.textContent.trim() === 'Latest articles');
     const section = h2 && h2.closest('section');
     if (!section || section.querySelector('.ocm-embed')) return;
+    // Collection list not connected yet — hide the whole section rather
+    // than showing Webflow's "No items found." empty state.
+    if (!section.querySelector('.w-dyn-item')) {
+      section.style.display = 'none';
+      return;
+    }
     Object.assign(section.style, {
       width: '100%', maxWidth: '1100px', margin: '0 auto',
       padding: '16px 16px 48px', boxSizing: 'border-box',
