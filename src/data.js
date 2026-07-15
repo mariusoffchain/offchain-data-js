@@ -200,7 +200,11 @@ async function _fetchLightningStats() {
 
 async function fetchLightningNodes() {
   const j = await _fetchLightningStats();
-  return j.map(d => ({ ts: d.added * 1000, v: d.node_count }));
+  // API returns node breakdown, not a single node_count field
+  return j.map(d => ({
+    ts: d.added * 1000,
+    v: (d.tor_nodes || 0) + (d.clearnet_nodes || 0) + (d.clearnet_tor_nodes || 0),
+  }));
 }
 
 async function fetchLightningChannels() {
