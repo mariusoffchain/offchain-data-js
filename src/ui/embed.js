@@ -8,6 +8,7 @@
  */
 
 import { CATALOG }                  from '../catalog.js';
+import { DESCRIPTIONS }             from '../descriptions.js';
 import { loadData, slicePeriod, fmtVal, fmtValBig } from '../data.js';
 import { drawFullChart }             from '../charts/fullchart.js';
 import { T }                         from '../tokens.js';
@@ -22,6 +23,24 @@ function _hasCoverage(data, period) {
   const days = PERIOD_DAYS[period];
   const span = s.length > 1 ? (s[s.length - 1].ts - s[0].ts) / 86_400_000 : 0;
   return span >= days * 0.7;
+}
+
+/**
+ * The "Latest articles" section on the CMS template page has no Webflow
+ * class (headless builder limitation) — align it with the chart section.
+ * Defensive: only touches the exact section, never throws.
+ */
+function _styleArticlesSection() {
+  try {
+    const h2 = [...document.querySelectorAll('h2')]
+      .find(h => h.textContent.trim() === 'Latest articles');
+    const section = h2 && h2.closest('section');
+    if (!section || section.querySelector('.ocm-embed')) return;
+    Object.assign(section.style, {
+      width: '100%', maxWidth: '1100px', margin: '0 auto',
+      padding: '16px 16px 48px', boxSizing: 'border-box',
+    });
+  } catch { /* never break the page over styling */ }
 }
 
 export async function renderEmbedChart(container, chartId) {
@@ -45,22 +64,46 @@ export async function renderEmbedChart(container, chartId) {
       .ocm-embed-pbtn:hover { border-color:${T.accent}; color:${T.accent}; }
       .ocm-embed-pbtn.active { border-color:${T.accent}; color:${T.accent}; background:rgba(247,147,26,0.08); }
       .ocm-embed-chart { width:100%; flex:1; min-height:340px; }
-      .ocm-embed-source { font-family:${T.body}; font-size:11px; color:${T.muted}; font-style:italic; padding:6px 0 0; text-align:right; }
+      .ocm-embed-back { font-family:${T.heading}; font-size:12px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; color:${T.textAdaptiveMuted}; text-decoration:none; display:inline-block; padding:0 0 14px; transition:color 0.15s; }
+      .ocm-embed-back:hover { color:${T.accent}; }
+      .ocm-embed-desc { font-family:${T.body}; font-size:15px; line-height:1.65; color:${T.textAdaptiveMuted}; max-width:720px; padding:20px 0 0; }
+      .ocm-embed-desc h3 { font-family:${T.heading}; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:${T.textAdaptive}; margin:0 0 8px; }
+      .ocm-embed-desc p { margin:0; }
     `;
     document.head.appendChild(st);
   }
 
+  // ── SEO: page title + meta description (no em dashes) ─────────────
+  document.title = `${cfg.title} | Off-Chain Media`;
+  const desc = DESCRIPTIONS[chartId];
+  if (desc) {
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'description');
+      document.head.appendChild(meta);
+    }
+    if (!meta.getAttribute('content')) {
+      const clean = desc.replace(/—/g, '-').replace(/\s+/g, ' ');
+      meta.setAttribute('content', clean.length > 155 ? clean.slice(0, 152).trimEnd() + '...' : clean);
+    }
+  }
+
   // ── Structure ──────────────────────────────────────────────────────
+  // Source attribution is drawn inside the chart SVG by fullchart.js
   container.classList.add('ocm-embed');
   container.innerHTML = `
+    <a class="ocm-embed-back" href="/data">&larr; All charts</a>
     <div class="ocm-embed-topbar">
       <span class="ocm-embed-headline">${cfg.title}</span>
       <span class="ocm-embed-reading">Loading…</span>
     </div>
     <div class="ocm-embed-periods"></div>
     <div class="ocm-embed-chart"></div>
-    <div class="ocm-embed-source">Source: ${cfg.source}</div>
+    ${desc ? `<div class="ocm-embed-desc"><h3>What this measures</h3><p>${desc}</p></div>` : ''}
   `;
+
+  _styleArticlesSection();
 
   const topbar   = container.querySelector('.ocm-embed-topbar');
   const reading  = container.querySelector('.ocm-embed-reading');
