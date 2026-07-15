@@ -7,9 +7,10 @@
  *   detail   ← shown when a card is clicked, hidden on back button
  */
 
-import { initGallery }    from './ui/gallery.js';
-import { renderDetail }   from './ui/detail.js';
-import { initBlockStrip } from './ui/blockstrip.js';
+import { initGallery }      from './ui/gallery.js';
+import { renderDetail }     from './ui/detail.js';
+import { renderEmbedChart } from './ui/embed.js';
+import { initBlockStrip }   from './ui/blockstrip.js';
 
 // ── State ─────────────────────────────────────────────────────────
 let currentChartId = null;
@@ -76,6 +77,14 @@ window.addEventListener('popstate', () => {
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function boot() {
+  // Embed mode: CMS template pages set window.__OCM__ to the chart id
+  const embedId  = window.__OCM__;
+  const embedEl  = document.querySelector('.ocm-embed');
+  if (embedId && embedEl) {
+    await renderEmbedChart(embedEl, embedId);
+    return;
+  }
+
   initPeriodBtns();
   initBackBtn();
   initBlockStrip();
