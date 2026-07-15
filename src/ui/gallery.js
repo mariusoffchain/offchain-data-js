@@ -10,8 +10,10 @@ import { initSidebar } from './sidebar.js';
 import { injectGalleryStyles } from './styles.js';
 import { T } from '../tokens.js';
 
-const CARD_PERIODS  = ['1W', '1M', '3M', '1Y', 'ALL'];
-const DEFAULT_PERIOD = '1M';
+const CARD_PERIODS   = ['1W', '1M', '3M', '1Y', 'ALL'];
+const DEFAULT_PERIOD = '1Y';
+// Preference order when picking the best available period
+const PERIOD_PREF    = ['1Y', '3M', '1M', '1W', 'ALL'];
 
 /**
  * initGallery(onCardClick)
@@ -90,6 +92,10 @@ async function _mountCard(card) {
   const { data, live } = await loadData(cfg.api);
   let currentPeriod = DEFAULT_PERIOD;
 
+  // Overwrite Webflow static title text with catalog title (fixes mismatches like "BTC Dominance")
+  const titleEl = card.querySelector('h1, h2, h3, h4, h5, h6');
+  if (titleEl && cfg.title) titleEl.textContent = cfg.title;
+
   // Headline always reflects the latest point — period only trims history.
   const last = data[data.length - 1];
   if (last) headline.textContent = fmtValBig(last.v, cfg.unit) + (live ? '' : ' (demo)');
@@ -100,7 +106,6 @@ async function _mountCard(card) {
     const lastSliced = sliced[sliced.length - 1];
 
     if (!chartDiv.firstChild) {
-      // drawFullChart found no data for this period — show a message
       chartDiv.style.cssText = 'display:flex;align-items:center;justify-content:center';
       chartDiv.innerHTML = `<span style="font-family:${T.body};font-style:italic;font-size:13px;color:rgba(128,128,128,0.5)">No data for this period</span>`;
     } else {
@@ -112,6 +117,18 @@ async function _mountCard(card) {
       readingEl.textContent = fmtVal(lastSliced.v, cfg.unit) + (live ? '' : ' (demo)');
     }
   };
+
+  // Hide period buttons for which this chart has no data
+  const availablePeriods = CARD_PERIODS.filter(p => slicePeriod(data, p).length > 0);
+  periodBar.querySelectorAll('.ocm-card-period-btn').forEach(btn => {
+    btn.style.display = availablePeriods.includes(btn.dataset.period) ? '' : 'none';
+  });
+
+  // Pick best starting period: 1Y preferred, fall back to 3M, then first available
+  currentPeriod = PERIOD_PREF.find(p => availablePeriods.includes(p)) || availablePeriods[0] || DEFAULT_PERIOD;
+  periodBar.querySelectorAll('.ocm-card-period-btn').forEach(b =>
+    b.classList.toggle('ocm-card-period-active', b.dataset.period === currentPeriod)
+  );
 
   periodBar.querySelectorAll('.ocm-card-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
