@@ -11,6 +11,7 @@ import { initGallery }      from './ui/gallery.js';
 import { renderDetail }     from './ui/detail.js';
 import { renderEmbedChart } from './ui/embed.js';
 import { initBlockStrip }   from './ui/blockstrip.js';
+import { CATALOG }          from './catalog.js';
 
 // ── State ─────────────────────────────────────────────────────────
 let currentChartId = null;
@@ -77,8 +78,12 @@ window.addEventListener('popstate', () => {
 
 // ── Boot ──────────────────────────────────────────────────────────
 async function boot() {
-  // Embed mode: CMS template pages set window.__OCM__ to the chart id
-  const embedId  = window.__OCM__;
+  // Embed mode: CMS template pages set window.__OCM__ to the chart id.
+  // Fallback: derive the id from a /charts/<slug> URL so template pages
+  // work without any per-page inline script.
+  const pathMatch = window.location.pathname.match(/^\/charts\/([a-z0-9-]+)\/?$/);
+  const pathId    = pathMatch && CATALOG.some(c => c.id === pathMatch[1]) ? pathMatch[1] : null;
+  const embedId  = window.__OCM__ || pathId;
   const embedEl  = document.querySelector('.ocm-embed');
   if (embedId && embedEl) {
     await renderEmbedChart(embedEl, embedId);
