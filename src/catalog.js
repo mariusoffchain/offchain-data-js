@@ -125,7 +125,7 @@ export const CATALOG = [
     category: 'on-chain',
     type:     'area',
     api:      'addresses',
-    unit:     'K',
+    unit:     'addresses',
     source:   'Coin Metrics',
   },
   {
@@ -155,7 +155,7 @@ export const CATALOG = [
     category: 'on-chain',
     type:     'bar',
     api:      'nvt',
-    unit:     'K',
+    unit:     'txns',
     source:   'Coin Metrics',
   },
 
@@ -167,7 +167,7 @@ export const CATALOG = [
     category: 'lightning',
     type:     'area',
     api:      'lnnodes',
-    unit:     'K',
+    unit:     'nodes',
     source:   'mempool.space',
   },
   {
@@ -177,7 +177,7 @@ export const CATALOG = [
     category: 'lightning',
     type:     'area',
     api:      'lnchannels',
-    unit:     'K',
+    unit:     'channels',
     source:   'mempool.space',
   },
   {
@@ -207,7 +207,7 @@ export const CATALOG = [
     category: 'lightning',
     type:     'ranking',
     api:      'lncountries',
-    unit:     'K',
+    unit:     'nodes',
     source:   'mempool.space',
   },
   {
@@ -217,7 +217,7 @@ export const CATALOG = [
     category: 'lightning',
     type:     'ranking',
     api:      'lnisp',
-    unit:     'K',
+    unit:     'nodes',
     source:   'mempool.space',
   },
 

@@ -545,15 +545,19 @@ export function slicePeriod(data, period) {
  * Formats a numeric value with its unit for display.
  */
 export function fmtVal(v, unit) {
-  if (unit === '$')     return v >= 1_000 ? `$${(v / 1_000).toFixed(0)}k` : `$${v.toFixed(0)}`;
-  if (unit === '$T')    return `$${v.toFixed(2)}T`;
-  if (unit === '$B')    return `$${v.toFixed(1)}B`;
-  if (unit === 'EH/s')  return `${v.toFixed(1)} EH/s`;
-  if (unit === '%')     return `${v.toFixed(1)}%`;
-  if (unit === 'M BTC') return `${v.toFixed(2)}M BTC`;
-  if (unit === 'K')     return `${(v / 1_000).toFixed(0)}K`;
-  if (unit === 'BTC')   return `${v.toFixed(3)} BTC`;
-  if (unit === 'T')     return `${v.toFixed(1)}T`;
+  if (unit === '$')         return v >= 1_000 ? `$${(v / 1_000).toFixed(0)}k` : `$${v.toFixed(0)}`;
+  if (unit === '$T')        return `$${v.toFixed(2)}T`;
+  if (unit === '$B')        return `$${v.toFixed(1)}B`;
+  if (unit === 'EH/s')      return `${v.toFixed(1)} EH/s`;
+  if (unit === '%')         return `${v.toFixed(1)}%`;
+  if (unit === 'M BTC')     return `${v.toFixed(2)}M BTC`;
+  if (unit === 'K')         return `${(v / 1_000).toFixed(0)}K`;
+  if (unit === 'BTC')       return `${v.toFixed(3)} BTC`;
+  if (unit === 'T')         return `${v.toFixed(1)}T`;
+  if (unit === 'addresses') return `${(v / 1_000).toFixed(0)}K addresses`;
+  if (unit === 'txns')      return `${(v / 1_000).toFixed(0)}K txns`;
+  if (unit === 'nodes')     return `${(v / 1_000).toFixed(0)}K nodes`;
+  if (unit === 'channels')  return `${(v / 1_000).toFixed(0)}K channels`;
   return v != null ? `${v.toFixed(2)}${unit ? ' ' + unit : ''}` : '—';
 }
 
@@ -564,9 +568,13 @@ export function fmtVal(v, unit) {
  */
 export function fmtValBig(v, unit) {
   if (v == null) return '—';
-  if (unit === '$')   return `$${Math.round(v).toLocaleString('en-US')}`;
-  if (unit === 'BTC') return `${v.toFixed(4)} BTC`;
-  if (unit === 'K')   return Math.round(v).toLocaleString('en-US');
+  if (unit === '$')         return `$${Math.round(v).toLocaleString('en-US')}`;
+  if (unit === 'BTC')       return `${v.toFixed(4)} BTC`;
+  if (unit === 'K')         return Math.round(v).toLocaleString('en-US');
+  if (unit === 'addresses') return `${Math.round(v).toLocaleString('en-US')} addresses`;
+  if (unit === 'txns')      return `${Math.round(v).toLocaleString('en-US')} txns`;
+  if (unit === 'nodes')     return `${Math.round(v).toLocaleString('en-US')} nodes`;
+  if (unit === 'channels')  return `${Math.round(v).toLocaleString('en-US')} channels`;
   return fmtVal(v, unit);
 }
 
@@ -585,7 +593,11 @@ export function fmtValTooltip(v, unit) {
   if (unit === '$B')    return `$${v.toFixed(2)}B`;
   if (unit === 'EH/s')  return `${v.toFixed(2)} EH/s`;
   if (unit === 'M BTC') return `${v.toFixed(3)}M BTC`;
-  if (unit === 'K')     return `${Math.round(v).toLocaleString('en-US')}`;
+  if (unit === 'K')         return `${Math.round(v).toLocaleString('en-US')}`;
+  if (unit === 'addresses') return `${Math.round(v).toLocaleString('en-US')} addresses`;
+  if (unit === 'txns')      return `${Math.round(v).toLocaleString('en-US')} txns`;
+  if (unit === 'nodes')     return `${Math.round(v).toLocaleString('en-US')} nodes`;
+  if (unit === 'channels')  return `${Math.round(v).toLocaleString('en-US')} channels`;
   if (unit === 'BTC')   return `${v.toFixed(4)} BTC`;
   if (unit === 'T')     return `${v.toFixed(2)}T`;
   if (unit === '%')     return `${v.toFixed(2)}%`;
