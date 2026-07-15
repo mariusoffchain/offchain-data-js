@@ -136,7 +136,9 @@ export function injectGalleryStyles() {
 
     .ocm-gallery-inner { flex: 1; min-width: 0; }
 
-    .ocm-cards-grid {
+    /* Target ocm-cards-grid AND any Webflow-renamed variants (e.g. ocm-cards-grid-1-2) */
+    [class*="ocm-cards-grid"] {
+      display: grid !important;
       grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
       gap: 20px !important;
       background: transparent !important;
@@ -254,7 +256,7 @@ export function injectGalleryStyles() {
         gap: 6px;
       }
       .ocm-sidebar-item { flex: 0 0 auto; white-space: nowrap; }
-      .ocm-cards-grid { grid-template-columns: 1fr !important; }
+      [class*="ocm-cards-grid"] { grid-template-columns: 1fr !important; }
     }
   `;
   document.head.appendChild(style);
