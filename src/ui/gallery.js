@@ -78,7 +78,8 @@ async function _initCards(onCardClick) {
     if (seeMore) {
       seeMore.addEventListener('click', e => {
         e.stopPropagation();
-        onCardClick(chartId);
+        // Navigate to the chart's dedicated CMS page
+        window.location.href = `/charts/${chartId}`;
       });
     }
 
