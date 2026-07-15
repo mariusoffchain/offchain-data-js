@@ -200,28 +200,39 @@ async function _fetchLightningStats() {
 
 async function fetchLightningNodes() {
   const j = await _fetchLightningStats();
-  // API returns node breakdown, not a single node_count field
-  return j.map(d => ({
-    ts: d.added * 1000,
-    v: (d.tor_nodes || 0) + (d.clearnet_nodes || 0) + (d.clearnet_tor_nodes || 0),
-  }));
+  // API returns data descending (newest first); sort ascending for charts.
+  // Filter zeros — the API occasionally emits a corrupt placeholder row.
+  return j
+    .map(d => ({
+      ts: d.added * 1000,
+      v: (d.tor_nodes || 0) + (d.clearnet_nodes || 0) + (d.clearnet_tor_nodes || 0),
+    }))
+    .filter(d => d.v > 0)
+    .sort((a, b) => a.ts - b.ts);
 }
 
 async function fetchLightningChannels() {
   const j = await _fetchLightningStats();
-  return j.map(d => ({ ts: d.added * 1000, v: d.channel_count }));
+  return j
+    .map(d => ({ ts: d.added * 1000, v: d.channel_count }))
+    .filter(d => d.v > 0)
+    .sort((a, b) => a.ts - b.ts);
 }
 
 async function fetchLightningCapacity() {
   const j = await _fetchLightningStats();
-  return j.map(d => ({ ts: d.added * 1000, v: d.total_capacity / 1e8 })); // sats → BTC
+  return j
+    .map(d => ({ ts: d.added * 1000, v: d.total_capacity / 1e8 })) // sats → BTC
+    .filter(d => d.v > 0)
+    .sort((a, b) => a.ts - b.ts);
 }
 
 async function fetchLightningAvgChannel() {
   const j = await _fetchLightningStats();
   return j
-    .filter(d => d.channel_count > 0)
-    .map(d => ({ ts: d.added * 1000, v: (d.total_capacity / 1e8) / d.channel_count }));
+    .filter(d => d.channel_count > 0 && d.total_capacity > 0)
+    .map(d => ({ ts: d.added * 1000, v: (d.total_capacity / 1e8) / d.channel_count }))
+    .sort((a, b) => a.ts - b.ts);
 }
 
 // Block Rewards — average total reward (subsidy + fees) per block.

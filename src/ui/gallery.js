@@ -118,10 +118,10 @@ async function _mountCard(card) {
     currentPeriod = 'ALL';
   }
 
-  // Headline: for time-series show latest value; for ranking show top-ranked item
+  // Headline: for time-series show latest value; for ranking show top item's value
   if (cfg.type === 'ranking') {
     const top = [...data].sort((a, b) => b.v - a.v)[0];
-    if (top) headline.textContent = top.name || '';
+    if (top) headline.textContent = fmtValBig(top.v, cfg.unit);
   } else {
     const last = data[data.length - 1];
     if (last) headline.textContent = fmtValBig(last.v, cfg.unit) + (live ? '' : ' (demo)');
@@ -140,8 +140,13 @@ async function _mountCard(card) {
     }
 
     const readingEl = card.querySelector('.ocm-card-reading');
-    if (readingEl && lastSliced) {
-      readingEl.textContent = fmtVal(lastSliced.v, cfg.unit) + (live ? '' : ' (demo)');
+    if (readingEl) {
+      if (cfg.type === 'ranking') {
+        const top = [...data].sort((a, b) => b.v - a.v)[0];
+        if (top) readingEl.textContent = top.name + (live ? '' : ' (demo)');
+      } else if (lastSliced) {
+        readingEl.textContent = fmtVal(lastSliced.v, cfg.unit) + (live ? '' : ' (demo)');
+      }
     }
   };
 
