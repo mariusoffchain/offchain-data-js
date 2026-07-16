@@ -111,26 +111,32 @@ export function injectGalleryStyles() {
       top: 24px;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 8px;
+      margin-bottom: 28px;
     }
 
     .ocm-sidebar-item {
       font-family: ${T.heading};
       font-size: 12px;
-      letter-spacing: 0.04em;
+      font-weight: 700;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
+      text-align: center;
       color: ${T.textAdaptiveMuted};
-      padding: 8px 10px;
+      border: 1px solid ${T.textAdaptiveMuted};
+      padding: 10px 14px;
       border-radius: 3px;
       cursor: pointer;
-      transition: background 0.15s, color 0.15s;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
     }
     .ocm-sidebar-item:hover {
       color: ${T.textAdaptive};
+      border-color: ${T.textAdaptive};
       background: light-dark(rgba(0,0,0,0.05), rgba(255,255,255,0.05));
     }
     .ocm-sidebar-item.ocm-sidebar-active {
       color: ${T.accent};
+      border-color: ${T.accent};
       background: rgba(247,147,26,0.10);
     }
 
