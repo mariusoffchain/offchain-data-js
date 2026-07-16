@@ -69,7 +69,8 @@ function _render(strip) {
     strip.appendChild(_cube('confirmed', {
       fee: b.extras.medianFee, range: b.extras.feeRange, fees: b.extras.totalFees,
       txs: b.tx_count, size: b.size,
-      meta: `${b.height.toLocaleString('en-US')} · ${fmtTimeAgo(b.timestamp)} · ${b.extras.pool.name}`,
+      meta: `${fmtTimeAgo(b.timestamp)} · ${b.extras.pool.name}`,
+      height: b.height,
     }));
   });
 
@@ -180,6 +181,14 @@ function _cube(kind, d) {
     <p class="ocm-bc-meta">${d.meta}</p>
   `;
   wrap.appendChild(content);
+
+  // Block height, centered below its cube (confirmed blocks only)
+  if (d.height != null) {
+    const h = document.createElement('p');
+    h.className = 'ocm-bc-height';
+    h.textContent = d.height.toLocaleString('en-US');
+    wrap.appendChild(h);
+  }
 
   return wrap;
 }

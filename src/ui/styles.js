@@ -22,7 +22,7 @@ export function injectGalleryStyles() {
       align-items: stretch;
       gap: 18px;
       overflow-x: auto;
-      padding: 24px 4px 28px;
+      padding: 24px 4px 40px;
       margin-bottom: 8px;
       scrollbar-width: none;
       -ms-overflow-style: none;
@@ -97,6 +97,19 @@ export function injectGalleryStyles() {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+    .ocm-bc-height {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      margin: 8px 0 0;
+      text-align: center;
+      font-family: ${T.heading};
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: ${T.textAdaptive};
     }
 
     .ocm-gallery-view {
