@@ -12,7 +12,7 @@ import { T } from '../tokens.js';
 // Chart canvas constants
 const W   = 680;
 const H   = 380;
-const PAD = { top: 52, right: 20, bottom: 46, left: 52 };
+const PAD = { top: 52, right: 20, bottom: 46, left: 38 };
 const CW  = W - PAD.left - PAD.right;
 const CH  = H - PAD.top  - PAD.bottom;
 

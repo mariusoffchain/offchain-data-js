@@ -247,16 +247,26 @@ export function injectGalleryStyles() {
     }
 
     @media (max-width: 700px) {
-      .ocm-gallery-view { flex-direction: column; gap: 16px; }
+      .ocm-gallery-view {
+        flex-direction: column;
+        gap: 16px;
+        padding-left: 2% !important;
+        padding-right: 2% !important;
+      }
       .ocm-sidebar {
+        flex: 0 0 auto;
         flex-direction: row;
         overflow-x: auto;
         position: static;
         width: 100%;
         gap: 6px;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
       }
-      .ocm-sidebar-item { flex: 0 0 auto; white-space: nowrap; }
+      .ocm-sidebar::-webkit-scrollbar { display: none; }
+      .ocm-sidebar-item { flex: 0 0 auto; align-self: center; white-space: nowrap; }
       [class*="ocm-cards-grid"] { grid-template-columns: 1fr !important; }
+      .ocm-category-section { border: none; padding: 0 0 8px; }
     }
   `;
   document.head.appendChild(style);

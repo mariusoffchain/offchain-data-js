@@ -69,7 +69,7 @@ export async function renderEmbedChart(container, chartId) {
       .ocm-embed-pbtn { font-family:${T.heading}; font-size:11px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; padding:4px 10px; border:1px solid rgba(128,128,128,0.25); border-radius:3px; cursor:pointer; color:${T.textAdaptiveMuted}; background:transparent; transition:all 0.15s; }
       .ocm-embed-pbtn:hover { border-color:${T.accent}; color:${T.accent}; }
       .ocm-embed-pbtn.active { border-color:${T.accent}; color:${T.accent}; background:rgba(247,147,26,0.08); }
-      .ocm-embed-chart { width:100%; flex:1; min-height:340px; }
+      .ocm-embed-chart { width:100%; aspect-ratio:680/380; }
       .ocm-embed-back { font-family:${T.heading}; font-size:12px; font-weight:500; letter-spacing:0.5px; text-transform:uppercase; color:${T.textAdaptiveMuted}; text-decoration:none; display:inline-block; padding:0 0 14px; transition:color 0.15s; }
       .ocm-embed-back:hover { color:${T.accent}; }
       .ocm-embed-desc { font-family:${T.body}; font-size:15px; line-height:1.65; color:${T.textAdaptiveMuted}; max-width:720px; padding:20px 0 0; }
