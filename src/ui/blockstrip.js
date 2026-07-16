@@ -22,6 +22,7 @@ const DEPTH = 10; // cube bevel depth, in the 0-100 viewBox unit
 
 let lastPending   = [];
 let lastConfirmed = [];
+let firstRender   = true;
 
 export function initBlockStrip() {
   const host = document.querySelector('.ocm-data-hero') || document.querySelector('.ocm-gallery-view');
@@ -46,6 +47,7 @@ export function initBlockStrip() {
 }
 
 function _render(strip) {
+  const prevScroll = strip.scrollLeft;
   strip.innerHTML = '';
 
   // Soonest pending block (index 0) sits last, i.e. closest to the
@@ -72,6 +74,19 @@ function _render(strip) {
   });
 
   strip.appendChild(_explorerLink());
+
+  // Initial view: pickaxe divider flush left so confirmed blocks are the
+  // first thing visible; pending blocks are reachable by scrolling left.
+  // Subsequent 45s refreshes keep whatever position the user scrolled to.
+  if (firstRender) {
+    firstRender = false;
+    if (strip.scrollWidth > strip.clientWidth) {
+      strip.scrollLeft = divider.getBoundingClientRect().left
+                       - strip.getBoundingClientRect().left;
+    }
+  } else {
+    strip.scrollLeft = prevScroll;
+  }
 }
 
 function _pickaxeIcon() {

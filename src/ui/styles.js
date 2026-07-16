@@ -125,7 +125,7 @@ export function injectGalleryStyles() {
       color: ${T.textAdaptiveMuted};
       border: 1px solid ${T.textAdaptiveMuted};
       padding: 10px 14px;
-      border-radius: 3px;
+      border-radius: 0;
       cursor: pointer;
       transition: background 0.15s, color 0.15s, border-color 0.15s;
     }

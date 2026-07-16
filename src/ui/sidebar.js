@@ -41,6 +41,22 @@ export function initSidebar(onFilter) {
     makeItem(label, cat);
   });
 
+  // Sticky offset: the site navbar is fixed, so the sidebar must stop
+  // below it (not slide underneath, where "All" becomes unclickable).
+  const navbarH = _fixedNavbarHeight();
+  if (navbarH) nav.style.top = `${navbarH + 16}px`;
+
   galleryView.insertBefore(nav, galleryView.firstChild);
   return nav;
+}
+
+// Height of the site's fixed/sticky top navbar, or 0 if none is found.
+function _fixedNavbarHeight() {
+  let el = document.querySelector('.w-nav, nav, header');
+  while (el && el !== document.body) {
+    const pos = getComputedStyle(el).position;
+    if (pos === 'fixed' || pos === 'sticky') return el.getBoundingClientRect().height;
+    el = el.parentElement;
+  }
+  return 0;
 }
