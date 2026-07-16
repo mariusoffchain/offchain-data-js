@@ -36,9 +36,61 @@ const COINMETRICS_BASE = 'https://community-api.coinmetrics.io/v4/timeseries/ass
 const BLOCK_SUBSIDY_BTC = 3.125;
 const BLOCKS_PER_DAY    = 144;
 
-// ─── In-memory cache (keyed by api id) ───────────────────────────
+// ─── Shared network helper ────────────────────────────────────────
+// All fetchers go through apiGet: caps concurrent requests so a page
+// full of charts doesn't fire 20 fetches at once (the surplus queues).
+const MAX_CONCURRENT = 4;
+let _activeReqs = 0;
+const _reqQueue = [];
+
+async function apiGet(url) {
+  if (_activeReqs >= MAX_CONCURRENT) {
+    await new Promise(resolve => _reqQueue.push(resolve));
+  }
+  _activeReqs++;
+  try {
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } finally {
+    _activeReqs--;
+    const next = _reqQueue.shift();
+    if (next) next();
+  }
+}
+
+// ─── Range plumbing ───────────────────────────────────────────────
+// Charts default to a bounded window (the view opens on 1Y); the full
+// history is only fetched when the user actually clicks "ALL".
+// range is 'default' | 'full'; each fetcher maps it to its API window.
+const mempoolInterval = range => (range === 'full' ? 'all' : '1y');
+
+// ─── In-memory cache (keyed by `${api}|${range}`) ─────────────────
 const cache = {};
-const _cmCache = {}; // Coin Metrics metric-level cache (avoids duplicate requests)
+const _inflight = {};   // in-flight promise dedupe (same key as cache)
+const _cmCache = {};    // Coin Metrics metric-level cache (keyed by `${metric}|${range}`)
+
+// ─── localStorage cache (bounded ranges only, 30 min TTL) ─────────
+// Makes /data ↔ /charts/<slug> navigation and quick revisits instant.
+// 'full' ranges are deliberately not persisted (too large for quota).
+const LS_PREFIX = 'ocm:d1:';
+const LS_TTL_MS = 30 * 60 * 1000;
+
+function lsGet(key) {
+  try {
+    const raw = localStorage.getItem(LS_PREFIX + key);
+    if (!raw) return null;
+    const { t, d } = JSON.parse(raw);
+    if (Date.now() - t > LS_TTL_MS) return null;
+    return d;
+  } catch { return null; }
+}
+
+function lsSet(key, d) {
+  try {
+    localStorage.setItem(LS_PREFIX + key, JSON.stringify({ t: Date.now(), d }));
+  } catch { /* quota exceeded or private mode — cache is best-effort */ }
+}
 
 // ─── Mock generator (seeded, deterministic) ──────────────────────
 function mockSeries(seed, length, base, amp, trend) {
@@ -141,65 +193,58 @@ function dailyAvg(points) {
     .map(([day, { sum, n }]) => ({ ts: day * 86_400_000, v: sum / n }));
 }
 
-async function fetchHashrate() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/hashrate/all`);
-  if (!r.ok) throw new Error(`hashrate HTTP ${r.status}`);
-  const j = await r.json();
+async function fetchHashrate(range) {
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/mining/hashrate/${mempoolInterval(range)}`);
   return j.hashrates.map(d => ({ ts: d.timestamp * 1000, v: d.avgHashrate / 1e18 }));
 }
 
-async function fetchDifficulty() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/difficulty-adjustments/all`);
-  if (!r.ok) throw new Error(`difficulty HTTP ${r.status}`);
-  const j = await r.json(); // [[ts_s, height, difficulty, adjustment], ...] newest first
+async function fetchDifficulty(range) {
+  // [[ts_s, height, difficulty, adjustment], ...] newest first
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/mining/difficulty-adjustments/${mempoolInterval(range)}`);
   return j
     .map(([ts, , diff]) => ({ ts: ts * 1000, v: diff / 1e12 }))
     .sort((a, b) => a.ts - b.ts);
 }
 
-async function fetchBlockFees() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fees/all`);
-  if (!r.ok) throw new Error(`fees HTTP ${r.status}`);
-  const j = await r.json(); // [{ timestamp, avgFees (sats) }, ...]
+async function fetchBlockFees(range) {
+  // [{ timestamp, avgFees (sats) }, ...]
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/mining/blocks/fees/${mempoolInterval(range)}`);
   return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFees / 1e8 })));
 }
 
-async function fetchFeeRates() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/fee-rates/all`);
-  if (!r.ok) throw new Error(`feerates HTTP ${r.status}`);
-  const j = await r.json(); // [{ timestamp, avgFee_50 (sat/vB) }, ...]
+async function fetchFeeRates(range) {
+  // [{ timestamp, avgFee_50 (sat/vB) }, ...]
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/mining/blocks/fee-rates/${mempoolInterval(range)}`);
   return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgFee_50 })));
 }
 
-async function fetchMempool() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/statistics/all`);
-  if (!r.ok) throw new Error(`mempool HTTP ${r.status}`);
-  const j = await r.json(); // [{ added (ts_s), vsizes: [vB per fee bucket] }, ...] newest first
+async function fetchMempool(range) {
+  // [{ added (ts_s), vsizes: [vB per fee bucket] }, ...] newest first
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/statistics/${mempoolInterval(range)}`);
   return dailyAvg(j.map(d => ({
     ts: d.added * 1000,
     v:  d.vsizes.reduce((a, b) => a + b, 0) / 1e6, // total pending vMB
   })));
 }
 
-async function fetchBlockWeight() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/sizes-weights/all`);
-  if (!r.ok) throw new Error(`blockweight HTTP ${r.status}`);
-  const j = await r.json(); // { weights: [{ timestamp, avgWeight (WU) }, ...] }
+async function fetchBlockWeight(range) {
+  // { weights: [{ timestamp, avgWeight (WU) }, ...] }
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/mining/blocks/sizes-weights/${mempoolInterval(range)}`);
   return dailyAvg(j.weights.map(d => ({ ts: d.timestamp * 1000, v: d.avgWeight / 1e6 })));
 }
 
-// Lightning Network stats — all three charts share one API call (cache avoids duplicates).
-let _lnCache = null;
-async function _fetchLightningStats() {
-  if (_lnCache) return _lnCache;
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/lightning/statistics/3y`);
-  if (!r.ok) throw new Error(`lightning stats HTTP ${r.status}`);
-  _lnCache = await r.json();
-  return _lnCache;
+// Lightning Network stats — the four LN charts share one API call per range.
+const _lnCache = {};
+async function _fetchLightningStats(range) {
+  const interval = range === 'full' ? 'all' : '3y';
+  if (!_lnCache[interval]) {
+    _lnCache[interval] = apiGet(`${MEMPOOL_BASE}/api/v1/lightning/statistics/${interval}`);
+  }
+  return _lnCache[interval];
 }
 
-async function fetchLightningNodes() {
-  const j = await _fetchLightningStats();
+async function fetchLightningNodes(range) {
+  const j = await _fetchLightningStats(range);
   // API returns data descending (newest first); sort ascending for charts.
   // Filter zeros — the API occasionally emits a corrupt placeholder row.
   return j
@@ -211,24 +256,24 @@ async function fetchLightningNodes() {
     .sort((a, b) => a.ts - b.ts);
 }
 
-async function fetchLightningChannels() {
-  const j = await _fetchLightningStats();
+async function fetchLightningChannels(range) {
+  const j = await _fetchLightningStats(range);
   return j
     .map(d => ({ ts: d.added * 1000, v: d.channel_count }))
     .filter(d => d.v > 0)
     .sort((a, b) => a.ts - b.ts);
 }
 
-async function fetchLightningCapacity() {
-  const j = await _fetchLightningStats();
+async function fetchLightningCapacity(range) {
+  const j = await _fetchLightningStats(range);
   return j
     .map(d => ({ ts: d.added * 1000, v: d.total_capacity / 1e8 })) // sats → BTC
     .filter(d => d.v > 0)
     .sort((a, b) => a.ts - b.ts);
 }
 
-async function fetchLightningAvgChannel() {
-  const j = await _fetchLightningStats();
+async function fetchLightningAvgChannel(range) {
+  const j = await _fetchLightningStats(range);
   return j
     .filter(d => d.channel_count > 0 && d.total_capacity > 0)
     .map(d => ({ ts: d.added * 1000, v: (d.total_capacity / 1e8) / d.channel_count }))
@@ -236,10 +281,9 @@ async function fetchLightningAvgChannel() {
 }
 
 // Block Rewards — average total reward (subsidy + fees) per block.
-async function fetchBlockRewards() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/blocks/rewards/all`);
-  if (!r.ok) throw new Error(`blockRewards HTTP ${r.status}`);
-  const j = await r.json(); // [{ timestamp, avgRewards (sats) }, ...]
+async function fetchBlockRewards(range) {
+  // [{ timestamp, avgRewards (sats) }, ...]
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/mining/blocks/rewards/${mempoolInterval(range)}`);
   return dailyAvg(j.map(d => ({ ts: d.timestamp * 1000, v: d.avgRewards / 1e8 })));
 }
 
@@ -247,9 +291,7 @@ async function fetchBlockRewards() {
 // Period buttons are hidden for ranking charts in gallery.js.
 
 async function fetchMiningPools() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/mining/pools/1y`);
-  if (!r.ok) throw new Error(`miningPools HTTP ${r.status}`);
-  const j = await r.json(); // { pools: [{name, blockCount, ...}], blockCount }
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/mining/pools/1y`); // { pools: [{name, blockCount, ...}], blockCount }
   const total = j.blockCount || 1;
   const now = Date.now();
   return j.pools
@@ -258,9 +300,7 @@ async function fetchMiningPools() {
 }
 
 async function fetchLightningCountries() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/lightning/nodes/countries`);
-  if (!r.ok) throw new Error(`lnCountries HTTP ${r.status}`);
-  const j = await r.json(); // { 'US': { name, count, capacity, share }, ... }
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/lightning/nodes/countries`); // { 'US': { name, count, ... }, ... }
   const now = Date.now();
   return Object.entries(j)
     .sort(([, a], [, b]) => b.count - a.count)
@@ -269,9 +309,7 @@ async function fetchLightningCountries() {
 }
 
 async function fetchLightningISP() {
-  const r = await fetch(`${MEMPOOL_BASE}/api/v1/lightning/nodes/isp-ranking`);
-  if (!r.ok) throw new Error(`lnISP HTTP ${r.status}`);
-  const j = await r.json(); // [{ isp, count, capacity, share }, ...]
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/lightning/nodes/isp-ranking`); // [{ isp, count, ... }, ...]
   const now = Date.now();
   return j
     .slice(0, 15)
@@ -279,41 +317,46 @@ async function fetchLightningISP() {
 }
 
 // Coin Metrics: one metric per call, browser-fetchable directly (no proxy).
-// Results are cached at the metric level so parallel fetchers don't duplicate requests.
-async function fetchCoinMetric(metric) {
-  if (_cmCache[metric]) return _cmCache[metric];
+// Default range covers 2 years (the view opens on 1Y); the full history
+// since 2010 is only pulled when the user clicks "ALL".
+// Results are cached at the metric+range level so parallel fetchers
+// don't duplicate requests.
+async function fetchCoinMetric(metric, range = 'default') {
+  const key = `${metric}|${range}`;
+  if (_cmCache[key]) return _cmCache[key];
   const end   = new Date();
-  const start = new Date('2010-01-01'); // earliest market price data available
+  const start = range === 'full'
+    ? new Date('2010-01-01') // earliest market price data available
+    : new Date(Date.now() - 2 * 365 * 86_400_000);
   const url = `${COINMETRICS_BASE}?assets=btc&metrics=${metric}&frequency=1d`
     + `&start_time=${start.toISOString().slice(0, 10)}&end_time=${end.toISOString().slice(0, 10)}`
     + `&page_size=10000`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error(`${metric} HTTP ${r.status}`);
-  const j = await r.json();
+  const j = await apiGet(url);
   const data = j.data.map(d => ({ ts: new Date(d.time).getTime(), v: parseFloat(d[metric]) }));
-  _cmCache[metric] = data;
+  _cmCache[key] = data;
   return data;
 }
 
-async function fetchAddresses() {
-  return fetchCoinMetric('AdrActCnt'); // raw count; fmtVal('K') divides by 1000
+async function fetchAddresses(range) {
+  return fetchCoinMetric('AdrActCnt', range); // raw count; fmtVal('K') divides by 1000
 }
 
-async function fetchTps() {
-  return (await fetchCoinMetric('TxCnt')).map(({ ts, v }) => ({ ts, v: v / 86_400 }));
+async function fetchTps(range) {
+  return (await fetchCoinMetric('TxCnt', range)).map(({ ts, v }) => ({ ts, v: v / 86_400 }));
 }
 
-async function fetchExchangeBalance() {
-  return (await fetchCoinMetric('SplyExNtv')).map(({ ts, v }) => ({ ts, v: v / 1_000_000 }));
+async function fetchExchangeBalance(range) {
+  return (await fetchCoinMetric('SplyExNtv', range)).map(({ ts, v }) => ({ ts, v: v / 1_000_000 }));
 }
 
 // Derived, not fetched: daily miner revenue per TH/s, from data other
 // fetchers already pull (avoids a 4th network dependency for one chart).
-async function fetchHashPrice() {
+async function fetchHashPrice(range) {
+  const full = range === 'full';
   const [{ data: fees }, { data: hash }, { data: price }] = await Promise.all([
-    loadData('fees'),
-    loadData('hashrate'),
-    loadData('price'),
+    loadData('fees',     { full }),
+    loadData('hashrate', { full }),
+    loadData('price',    { full }),
   ]);
   const hashByDay  = new Map(hash.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
   const priceByDay = new Map(price.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
@@ -331,43 +374,38 @@ async function fetchHashPrice() {
 
 // Price + market cap from Coin Metrics (free, no key, open CORS — more reliable than
 // CoinGecko's public endpoint which rate-limits anonymous requests).
-async function fetchPrice() {
-  const daily = await fetchCoinMetric('PriceUSD');
+async function fetchPrice(range) {
+  const daily = await fetchCoinMetric('PriceUSD', range);
 
   // Supplement with CoinGecko hourly data for the last 30 days.
   // CoinGecko auto-selects hourly when days ≤ 90 and no interval= is set.
   try {
     const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
-    const r = await fetch(
+    const j = await apiGet(
       `https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=30${key}`
     );
-    if (r.ok) {
-      const j = await r.json();
-      const hourly = (j.prices || [])
-        .filter(([, v]) => v != null)
-        .map(([ts, v]) => ({ ts, v }));
-      if (hourly.length > 24) {
-        // Replace last 30 days of daily with hourly for finer resolution
-        const cutoff = hourly[0].ts;
-        return [...daily.filter(d => d.ts < cutoff), ...hourly];
-      }
+    const hourly = (j.prices || [])
+      .filter(([, v]) => v != null)
+      .map(([ts, v]) => ({ ts, v }));
+    if (hourly.length > 24) {
+      // Replace last 30 days of daily with hourly for finer resolution
+      const cutoff = hourly[0].ts;
+      return [...daily.filter(d => d.ts < cutoff), ...hourly];
     }
   } catch { /* hourly supplement is optional */ }
 
   return daily;
 }
 
-async function fetchMarketCap() {
-  return (await fetchCoinMetric('CapMrktCurUSD')).map(d => ({ ts: d.ts, v: d.v / 1e12 }));
+async function fetchMarketCap(range) {
+  return (await fetchCoinMetric('CapMrktCurUSD', range)).map(d => ({ ts: d.ts, v: d.v / 1e12 }));
 }
 
 // 24h trading volume: no free on-chain proxy for exchange volume → keep CoinGecko.
 // No interval=daily: CoinGecko auto-selects daily for 365 days.
 async function fetchVolume() {
   const key = COINGECKO_API_KEY ? `&x_cg_demo_api_key=${COINGECKO_API_KEY}` : '';
-  const r = await fetch(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365${key}`);
-  if (!r.ok) throw new Error(`CoinGecko volume HTTP ${r.status}`);
-  const j = await r.json();
+  const j = await apiGet(`https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365${key}`);
   if (!j.total_volumes?.length) throw new Error('CoinGecko volume: empty response');
   return j.total_volumes
     .filter(([, v]) => v != null && v > 0)
@@ -376,22 +414,22 @@ async function fetchVolume() {
 
 // Circulating Supply — SplyCur / 1e6 → M BTC.
 // Replaces BTC dominance (no free historical dominance source exists).
-async function fetchCircSupply() {
-  return (await fetchCoinMetric('SplyCur')).map(d => ({ ts: d.ts, v: d.v / 1e6 }));
+async function fetchCircSupply(range) {
+  return (await fetchCoinMetric('SplyCur', range)).map(d => ({ ts: d.ts, v: d.v / 1e6 }));
 }
 
 // Daily transaction count — raw TxCnt; fmtVal('K') divides by 1000 for display.
 // Replaces NVT (TxTfrValAdjUSD is paywalled on Coin Metrics community plan).
-async function fetchTxCount() {
-  return fetchCoinMetric('TxCnt');
+async function fetchTxCount(range) {
+  return fetchCoinMetric('TxCnt', range);
 }
 
 // Daily miner revenue: block subsidy (IssTotNtv) + fees (FeeTotNtv), in BTC.
 // Replaces LTH Supply (SplyAct1yr is paywalled on Coin Metrics community plan).
-async function fetchMinerRevenue() {
+async function fetchMinerRevenue(range) {
   const [issuance, fees] = await Promise.all([
-    fetchCoinMetric('IssTotNtv'),
-    fetchCoinMetric('FeeTotNtv'),
+    fetchCoinMetric('IssTotNtv', range),
+    fetchCoinMetric('FeeTotNtv', range),
   ]);
   const feeByDay = new Map(fees.map(d => [Math.floor(d.ts / 86_400_000), d.v]));
   return issuance.map(({ ts, v: iss }) => ({
@@ -435,9 +473,7 @@ function mockRecentBlocks() {
  */
 export async function loadMempoolBlocks() {
   try {
-    const r = await fetch(`${MEMPOOL_BASE}/api/v1/fees/mempool-blocks`);
-    if (!r.ok) throw new Error(`mempool-blocks HTTP ${r.status}`);
-    return { data: await r.json(), live: true };
+    return { data: await apiGet(`${MEMPOOL_BASE}/api/v1/fees/mempool-blocks`), live: true };
   } catch (err) {
     console.warn('[data] Falling back to mock for "mempool-blocks":', err.message);
     return { data: mockMempoolBlocks(), live: false };
@@ -452,9 +488,7 @@ export async function loadRecentBlocks() {
   try {
     // v1, not the plain /api/blocks — only v1 includes `extras`
     // (pool name, medianFee, feeRange, totalFees) that the strip renders.
-    const r = await fetch(`${MEMPOOL_BASE}/api/v1/blocks`);
-    if (!r.ok) throw new Error(`blocks HTTP ${r.status}`);
-    return { data: await r.json(), live: true };
+    return { data: await apiGet(`${MEMPOOL_BASE}/api/v1/blocks`), live: true };
   } catch (err) {
     console.warn('[data] Falling back to mock for "blocks":', err.message);
     return { data: mockRecentBlocks(), live: false };
@@ -503,28 +537,58 @@ const FETCHERS = {
 // ─── Public API ───────────────────────────────────────────────────
 
 /**
- * loadData(apiKey)
+ * loadData(apiKey, { full })
  * Returns { data: Array<{ts,v}>, live: boolean }
+ *
+ * full: false (default) → bounded window (1-3y, fast). The initial view
+ * only shows up to 1Y, so this is all a page needs to render.
+ * full: true → complete history; fetched lazily when "ALL" is clicked.
+ *
+ * Caching layers: in-memory (per page) → localStorage (30 min, bounded
+ * ranges only) → network. In-flight requests are deduplicated.
  * Falls back to mock on any error.
  */
-export async function loadData(apiKey) {
-  // Return from cache if available
-  if (cache[apiKey]) return { data: cache[apiKey], live: true };
+export async function loadData(apiKey, { full = false } = {}) {
+  const range = full ? 'full' : 'default';
+  const key   = `${apiKey}|${range}`;
 
-  const fetcher = FETCHERS[apiKey];
-  if (fetcher) {
-    try {
-      const data    = await fetcher();
-      cache[apiKey] = data;
-      return { data, live: true };
-    } catch (err) {
-      console.warn(`[data] Falling back to mock for "${apiKey}":`, err.message);
+  // Full history is a superset of the bounded window
+  if (cache[`${apiKey}|full`]) return { data: cache[`${apiKey}|full`], live: true };
+  if (cache[key])              return { data: cache[key], live: true };
+
+  if (_inflight[key]) return _inflight[key];
+
+  _inflight[key] = (async () => {
+    if (!full) {
+      const stored = lsGet(apiKey);
+      if (stored) {
+        cache[key] = stored;
+        return { data: stored, live: true };
+      }
     }
-  }
 
-  // Mock fallback
-  const mockFn = MOCK[apiKey] || MOCK.price;
-  return { data: mockFn(), live: false };
+    const fetcher = FETCHERS[apiKey];
+    if (fetcher) {
+      try {
+        const data = await fetcher(range);
+        cache[key] = data;
+        if (!full) lsSet(apiKey, data);
+        return { data, live: true };
+      } catch (err) {
+        console.warn(`[data] Falling back to mock for "${apiKey}":`, err.message);
+      }
+    }
+
+    // Mock fallback
+    const mockFn = MOCK[apiKey] || MOCK.price;
+    return { data: mockFn(), live: false };
+  })();
+
+  try {
+    return await _inflight[key];
+  } finally {
+    delete _inflight[key];
+  }
 }
 
 /**

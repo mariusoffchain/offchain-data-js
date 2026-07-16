@@ -11,6 +11,7 @@ import { CATALOG }                  from '../catalog.js';
 import { DESCRIPTIONS }             from '../descriptions.js';
 import { loadData, slicePeriod, fmtVal, fmtValBig } from '../data.js';
 import { drawFullChart }             from '../charts/fullchart.js';
+import { chartSkeleton }             from './skeleton.js';
 import { T }                         from '../tokens.js';
 
 const PERIODS     = ['1W', '1M', '3M', '1Y', 'ALL'];
@@ -116,8 +117,19 @@ export async function renderEmbedChart(container, chartId) {
   const periodsEl= container.querySelector('.ocm-embed-periods');
   const chartEl  = container.querySelector('.ocm-embed-chart');
 
+  // Skeleton while data loads
+  chartEl.appendChild(chartSkeleton());
+
   // ── Fetch data ─────────────────────────────────────────────────────
-  const { data, live } = await loadData(cfg.api);
+  let { data, live } = await loadData(cfg.api);
+
+  // Full history is only fetched when the user clicks ALL (lazy)
+  let fullRequested = false;
+  const ensureFullData = async () => {
+    if (fullRequested) return;
+    fullRequested = true;
+    ({ data, live } = await loadData(cfg.api, { full: true }));
+  };
 
   // Headline: ranking → top value, time-series → latest value
   if (cfg.type === 'ranking') {
@@ -141,11 +153,12 @@ export async function renderEmbedChart(container, chartId) {
     const btn = document.createElement('button');
     btn.className = 'ocm-embed-pbtn' + (p === current ? ' active' : '');
     btn.textContent = p;
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       current = p;
       periodsEl.querySelectorAll('.ocm-embed-pbtn').forEach(b =>
         b.classList.toggle('active', b === btn)
       );
+      if (p === 'ALL') await ensureFullData();
       _render();
     });
     periodsEl.appendChild(btn);

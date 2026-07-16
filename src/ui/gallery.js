@@ -8,6 +8,7 @@ import { loadData, slicePeriod, fmtVal, fmtValBig } from '../data.js';
 import { drawFullChart } from '../charts/fullchart.js';
 import { initSidebar } from './sidebar.js';
 import { injectGalleryStyles } from './styles.js';
+import { chartSkeleton } from './skeleton.js';
 import { T } from '../tokens.js';
 
 const CARD_PERIODS   = ['1W', '1M', '3M', '1Y', 'ALL'];
@@ -62,11 +63,6 @@ function _initFilters() {
 
 // ── Card initialization ────────────────────────────────────────────
 async function _initCards(onCardClick) {
-  // Pre-fetch market data once to avoid 4 separate CoinGecko calls
-  try {
-    await loadData('price'); // warms cache._market for price, marketcap, volume
-  } catch { /* fallback handled inside loadData */ }
-
   const cards = document.querySelectorAll('.ocm-card');
   const observer = new IntersectionObserver(_onCardVisible, { rootMargin: '200px 0px' });
 
@@ -83,8 +79,21 @@ async function _initCards(onCardClick) {
       });
     }
 
+    // Skeleton immediately, so cards never sit empty while data loads
+    const chartDiv = card.querySelector('.ocm-card-chart');
+    if (chartDiv && !chartDiv.firstChild) {
+      chartDiv.classList.add('ocm-card-chart-full');
+      chartDiv.appendChild(chartSkeleton());
+    }
+
     observer.observe(card);
   });
+
+  // Off-screen charts: warm the cache during idle time so scrolling
+  // (and navigation to /charts/<slug>) finds data already loaded.
+  // The request queue in data.js paces these behind visible charts.
+  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 2500));
+  idle(() => { CATALOG.forEach(c => { loadData(c.api).catch(() => {}); }); });
 }
 
 function _onCardVisible(entries, observer) {
@@ -106,8 +115,16 @@ async function _mountCard(card) {
 
   const { periodBar, headline } = _buildTopRow(card);
 
-  const { data, live } = await loadData(cfg.api);
+  let { data, live } = await loadData(cfg.api);
   let currentPeriod = DEFAULT_PERIOD;
+
+  // Full history is only fetched when the user clicks ALL (lazy)
+  let fullRequested = false;
+  const ensureFullData = async () => {
+    if (fullRequested) return;
+    fullRequested = true;
+    ({ data, live } = await loadData(cfg.api, { full: true }));
+  };
 
   // Overwrite Webflow static title text with catalog title (fixes mismatches like "BTC Dominance")
   const titleEl = card.querySelector('h1, h2, h3, h4, h5, h6');
@@ -167,11 +184,12 @@ async function _mountCard(card) {
   }
 
   periodBar.querySelectorAll('.ocm-card-period-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       currentPeriod = btn.dataset.period;
       periodBar.querySelectorAll('.ocm-card-period-btn').forEach(b =>
         b.classList.toggle('ocm-card-period-active', b === btn)
       );
+      if (currentPeriod === 'ALL') await ensureFullData();
       render(currentPeriod);
     });
   });

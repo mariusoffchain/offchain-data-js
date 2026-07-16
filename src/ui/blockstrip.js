@@ -15,6 +15,7 @@
 
 import { svgEl } from '../drawing.js';
 import { T } from '../tokens.js';
+import { injectSkeletonStyles } from './skeleton.js';
 import { loadMempoolBlocks, loadRecentBlocks, fmtTimeAgo } from '../data.js';
 
 const REFRESH_MS = 45_000;
@@ -31,6 +32,15 @@ export function initBlockStrip() {
   const strip = document.createElement('div');
   strip.className = 'ocm-blockstrip';
   host.parentElement.insertBefore(strip, host);
+
+  // Ghost cubes while block data loads
+  injectSkeletonStyles();
+  for (let i = 0; i < 8; i++) {
+    const ghost = document.createElement('div');
+    ghost.className = 'ocm-block-cube';
+    ghost.innerHTML = '<div class="ocm-skel" style="position:absolute;inset:0"></div>';
+    strip.appendChild(ghost);
+  }
 
   const fetchAndRender = async () => {
     const [{ data: pending }, { data: confirmed }] = await Promise.all([

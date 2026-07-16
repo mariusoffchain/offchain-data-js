@@ -7,6 +7,7 @@ import { CATALOG } from '../catalog.js';
 import { EDITORIAL } from '../editorial.js';
 import { loadData, slicePeriod, fmtVal } from '../data.js';
 import { drawFullChart } from '../charts/fullchart.js';
+import { chartSkeleton } from './skeleton.js';
 import { T } from '../tokens.js';
 
 /**
@@ -45,10 +46,15 @@ export async function renderDetail(chartId, period) {
   // Loading state
   _setText(el, '.ocm-reading-value', 'Loading…');
   const chartEl = el.querySelector('.ocm-detail-chart');
-  if (chartEl) chartEl.innerHTML = `<p style="padding:20px;font-family:${T.body};color:${T.muted};font-style:italic">Loading chart…</p>`;
+  if (chartEl) {
+    chartEl.innerHTML = '';
+    const skel = chartSkeleton();
+    skel.style.minHeight = '300px';
+    chartEl.appendChild(skel);
+  }
 
-  // Fetch data
-  const { data, live } = await loadData(cfg.api);
+  // Fetch data — full history only when the ALL period is requested
+  const { data, live } = await loadData(cfg.api, { full: period === 'ALL' });
   const sliced = slicePeriod(data, period);
   const last   = sliced[sliced.length - 1];
 
