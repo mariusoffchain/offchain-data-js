@@ -309,11 +309,15 @@ async function fetchLightningCountries() {
 }
 
 async function fetchLightningISP() {
-  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/lightning/nodes/isp-ranking`); // [{ isp, count, ... }, ...]
+  // { ispRanking: [[asn, name, capacity_sats, channels, nodes], ...], ... }
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/lightning/nodes/isp-ranking`);
   const now = Date.now();
-  return j
+  return (j.ispRanking || [])
+    .map(e => ({ name: e[1] || 'Unknown', v: e[4] }))
+    .filter(d => d.v > 0)
+    .sort((a, b) => b.v - a.v)
     .slice(0, 15)
-    .map((d, i) => ({ ts: now - i * 100, v: d.count, name: d.isp || 'Unknown' }));
+    .map((d, i) => ({ ts: now - i * 100, v: d.v, name: d.name }));
 }
 
 // Coin Metrics: one metric per call, browser-fetchable directly (no proxy).
