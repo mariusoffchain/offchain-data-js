@@ -61,7 +61,7 @@ export async function renderEmbedChart(container, chartId) {
     const st = document.createElement('style');
     st.id = 'ocm-embed-styles';
     st.textContent = `
-      .ocm-embed { display:flex; flex-direction:column; gap:0; }
+      .ocm-embed { display:flex; flex-direction:column; gap:0; width:100%; max-width:720px; margin:0 auto; }
       .ocm-embed-topbar { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:8px; padding:0 0 12px; }
       .ocm-embed-headline { font-family:${T.heading}; font-size:clamp(22px,3vw,32px); font-weight:700; color:${T.textAdaptive}; letter-spacing:-0.5px; line-height:1; }
       .ocm-embed-reading { font-family:${T.heading}; font-size:clamp(20px,2.4vw,28px); font-weight:700; color:${T.accent}; }
