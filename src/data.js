@@ -73,7 +73,9 @@ const _cmCache = {};    // Coin Metrics metric-level cache (keyed by `${metric}|
 // ─── localStorage cache (bounded ranges only, 30 min TTL) ─────────
 // Makes /data ↔ /charts/<slug> navigation and quick revisits instant.
 // 'full' ranges are deliberately not persisted (too large for quota).
-const LS_PREFIX = 'ocm:d1:';
+// Bump the version segment to invalidate everyone's stored series
+// (e.g. after a fetcher parsing fix changes the stored shape).
+const LS_PREFIX = 'ocm:d2:';
 const LS_TTL_MS = 30 * 60 * 1000;
 
 function lsGet(key) {
