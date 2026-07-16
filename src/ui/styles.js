@@ -266,6 +266,23 @@ export function injectGalleryStyles() {
     }
 
     @media (max-width: 700px) {
+      /* Safety net: iOS Safari lets the whole page pan sideways the
+         moment any element overflows by a pixel. Clip at the root so
+         the page always stays centered. */
+      html, body {
+        overflow-x: hidden !important;
+        overflow-x: clip !important;
+        max-width: 100vw;
+      }
+      /* Long headline values (e.g. "912,345 addresses") were overflowing
+         the card on narrow screens — let the top row wrap instead. */
+      .ocm-card-toprow { flex-wrap: wrap; }
+      .ocm-card-headline {
+        font-size: 19px;
+        white-space: normal;
+        text-align: left;
+        overflow-wrap: anywhere;
+      }
       .ocm-gallery-view {
         flex-direction: column;
         gap: 16px;

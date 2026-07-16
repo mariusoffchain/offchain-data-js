@@ -300,12 +300,14 @@ async function fetchMiningPools() {
 }
 
 async function fetchLightningCountries() {
-  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/lightning/nodes/countries`); // { 'US': { name, count, ... }, ... }
+  // [{ name: { en, fr, ... }, iso, count, capacity, share }, ...]
+  const j = await apiGet(`${MEMPOOL_BASE}/api/v1/lightning/nodes/countries`);
   const now = Date.now();
-  return Object.entries(j)
-    .sort(([, a], [, b]) => b.count - a.count)
+  return j
+    .slice()
+    .sort((a, b) => b.count - a.count)
     .slice(0, 15)
-    .map(([, d], i) => ({ ts: now - i * 100, v: d.count, name: d.name || d.isoCode }));
+    .map((d, i) => ({ ts: now - i * 100, v: d.count, name: d.name?.en || d.iso || 'Unknown' }));
 }
 
 async function fetchLightningISP() {

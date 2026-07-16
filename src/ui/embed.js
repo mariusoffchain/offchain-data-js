@@ -76,6 +76,10 @@ export async function renderEmbedChart(container, chartId) {
       .ocm-embed-desc { font-family:${T.body}; font-size:15px; line-height:1.65; color:${T.textAdaptiveMuted}; max-width:720px; padding:20px 0 0; }
       .ocm-embed-desc h3 { font-family:${T.heading}; font-size:13px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:${T.textAdaptive}; margin:0 0 8px; }
       .ocm-embed-desc p { margin:0; }
+      @media (max-width: 700px) {
+        /* Safety net against iOS sideways panning when anything overflows */
+        html, body { overflow-x: hidden !important; overflow-x: clip !important; max-width: 100vw; }
+      }
     `;
     document.head.appendChild(st);
   }
