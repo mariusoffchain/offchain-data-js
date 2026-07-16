@@ -76,12 +76,15 @@ function _render(strip) {
 
   strip.appendChild(_explorerLink());
 
-  // Initial view: pickaxe divider flush left so confirmed blocks are the
-  // first thing visible; pending blocks are reachable by scrolling left.
-  // Subsequent 45s refreshes keep whatever position the user scrolled to.
+  // Mobile initial view: pickaxe divider flush left so confirmed blocks
+  // are the first thing visible; pending blocks are reachable by
+  // scrolling left. Desktop keeps the natural position (pending blocks
+  // on the left, divider roughly mid-screen). Subsequent 45s refreshes
+  // keep whatever position the user scrolled to.
   if (firstRender) {
     firstRender = false;
-    if (strip.scrollWidth > strip.clientWidth) {
+    if (window.matchMedia('(max-width: 700px)').matches
+        && strip.scrollWidth > strip.clientWidth) {
       strip.scrollLeft = divider.getBoundingClientRect().left
                        - strip.getBoundingClientRect().left;
     }
