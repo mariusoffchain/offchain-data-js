@@ -300,7 +300,10 @@ export function injectGalleryStyles() {
            scroll behind it. */
         position: sticky;
         top: var(--ocm-nav-h, 69px);
-        z-index: 20;
+        /* Above the chart cards, but below the site navbar (z-index 2) so the
+           mobile menu, which lives inside the navbar, covers the bar when open
+           instead of the bar showing through on top of it. */
+        z-index: 1;
         width: 100%;
         gap: 6px;
         margin: 0 -2%;
