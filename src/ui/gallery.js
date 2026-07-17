@@ -38,27 +38,10 @@ function _hasCoverage(data, period) {
  */
 export async function initGallery(onCardClick) {
   injectGalleryStyles();
-  _initFilters();
-  initSidebar(_applyFilter);
+  // Sidebar is now scroll navigation (scrollspy), not a filter: every
+  // category section stays on the page at all times.
+  initSidebar();
   await _initCards(onCardClick);
-}
-
-// ── Category filtering (shared by sidebar + legacy top bar) ────────
-function _applyFilter(filter) {
-  document.querySelectorAll('.ocm-category-section').forEach(sec => {
-    sec.style.display = (filter === 'all' || sec.dataset.category === filter) ? '' : 'none';
-  });
-}
-
-function _initFilters() {
-  const btns = document.querySelectorAll('.ocm-filter-btn');
-  btns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      btns.forEach(b => b.classList.remove('ocm-filter-active'));
-      btn.classList.add('ocm-filter-active');
-      _applyFilter(btn.dataset.filter);
-    });
-  });
 }
 
 // ── Card initialization ────────────────────────────────────────────

@@ -1,53 +1,89 @@
 /**
  * Sidebar navigation
- * Items are derived from the ocm-category-section elements present on the
- * page, in DOM order. No Webflow filter buttons required — adding a new
- * ocm-category-section to Webflow automatically adds it to the sidebar.
+ * One entry per ocm-category-section, in DOM order. Clicking an entry
+ * smooth-scrolls to that section; as the reader scrolls, the entry for the
+ * section currently under the navbar is highlighted (scrollspy). No "All"
+ * button and no filtering — every section is always on the page.
+ *
+ * Adding a new ocm-category-section in Webflow automatically adds it here.
  */
 
-export function initSidebar(onFilter) {
+export function initSidebar() {
   const galleryView = document.querySelector('.ocm-gallery-view');
   if (!galleryView) return null;
 
   const sections = [...document.querySelectorAll('.ocm-category-section[data-category]')];
   if (!sections.length) return null;
 
+  const navbarH = _fixedNavbarHeight();
+  // Expose the navbar height to CSS so the sidebar (sticky on desktop AND
+  // mobile) can park itself just below the fixed site navbar.
+  document.documentElement.style.setProperty('--ocm-nav-h', `${navbarH}px`);
+
   const nav = document.createElement('nav');
   nav.className = 'ocm-sidebar';
 
   const items = [];
+  const setActive = cat => items.forEach(i =>
+    i.classList.toggle('ocm-sidebar-active', i.dataset.filter === cat)
+  );
 
-  const makeItem = (label, filter, active = false) => {
-    const item = document.createElement('div');
-    item.className = 'ocm-sidebar-item' + (active ? ' ocm-sidebar-active' : '');
+  // One entry per section in page order; format "on-chain" → "On-Chain".
+  sections.forEach((sec, idx) => {
+    const cat   = sec.dataset.category;
+    const label = cat.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('-');
+    const item  = document.createElement('div');
+    item.className = 'ocm-sidebar-item' + (idx === 0 ? ' ocm-sidebar-active' : '');
     item.textContent = label;
-    item.dataset.filter = filter;
+    item.dataset.filter = cat;
     item.addEventListener('click', () => {
-      items.forEach(i => i.classList.remove('ocm-sidebar-active'));
-      item.classList.add('ocm-sidebar-active');
-      onFilter(filter);
+      setActive(cat);
+      _scrollToSection(sec, navbarH, nav);
     });
     nav.appendChild(item);
     items.push(item);
-  };
-
-  // "All" is always first
-  makeItem('All', 'all', true);
-
-  // One entry per section in page order; format "on-chain" → "On-Chain"
-  sections.forEach(sec => {
-    const cat   = sec.dataset.category;
-    const label = cat.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('-');
-    makeItem(label, cat);
   });
 
-  // Sticky offset: the site navbar is fixed, so the sidebar must stop
-  // below it (not slide underneath, where "All" becomes unclickable).
-  const navbarH = _fixedNavbarHeight();
-  if (navbarH) nav.style.top = `${navbarH + 16}px`;
-
   galleryView.insertBefore(nav, galleryView.firstChild);
+
+  // Scrollspy: highlight the entry for whichever section currently sits
+  // under the navbar. rAF-throttled so scrolling stays smooth.
+  let ticking = false;
+  const onScroll = () => {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      ticking = false;
+      const line = navbarH + _stickyBarHeight(nav) + 24;
+      let current = sections[0].dataset.category;
+      for (const sec of sections) {
+        if (sec.getBoundingClientRect().top - line <= 0) current = sec.dataset.category;
+        else break;
+      }
+      setActive(current);
+    });
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+
   return nav;
+}
+
+// Smooth-scroll a section to just below the navbar (and, on mobile, below
+// the category bar, which is sticky there and would otherwise cover it).
+function _scrollToSection(sec, navbarH, nav) {
+  const offset = navbarH + _stickyBarHeight(nav) + 16;
+  const top = sec.getBoundingClientRect().top + window.scrollY - offset;
+  window.scrollTo({ top, behavior: 'smooth' });
+}
+
+// The category bar only reserves vertical space when it is laid out as the
+// horizontal sticky bar (mobile). Beside the content (desktop) it takes none.
+function _stickyBarHeight(nav) {
+  return getComputedStyle(nav).flexDirection === 'row'
+    ? nav.getBoundingClientRect().height
+    : 0;
 }
 
 // Height of the site's fixed/sticky top navbar, or 0 if none is found.

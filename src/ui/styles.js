@@ -121,7 +121,9 @@ export function injectGalleryStyles() {
     .ocm-sidebar {
       flex: 0 0 152px;
       position: sticky;
-      top: 24px;
+      /* Park just below the fixed site navbar (--ocm-nav-h is set at runtime
+         from the measured navbar height; 69px is the current fallback). */
+      top: calc(var(--ocm-nav-h, 69px) + 16px);
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -293,9 +295,17 @@ export function injectGalleryStyles() {
         flex: 0 0 auto;
         flex-direction: row;
         overflow-x: auto;
-        position: static;
+        /* Stays pinned under the navbar while the block strip and everything
+           above it scrolls away. Full-bleed background masks the cards that
+           scroll behind it. */
+        position: sticky;
+        top: var(--ocm-nav-h, 69px);
+        z-index: 20;
         width: 100%;
         gap: 6px;
+        margin: 0 -2%;
+        padding: 8px 2%;
+        background: light-dark(${T.paper}, ${T.ink});
         scrollbar-width: none;
         -ms-overflow-style: none;
       }
